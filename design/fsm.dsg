@@ -1,0 +1,93 @@
+		fsm - finite state machine design doc
+the matrix of a machine
+|----------------------------------------------------|
+|        |                    state                  |
+| events |-------------------------------------------|
+|        |    UP    |   DOWN   |   LEFT   |  RIGHT   |
+|--------|-------------------------------------------|
+| StReq  |    R1    |    R1    |    R1    |    R1    |
+| ChReqU |    E1    |    CU    |    CU    |    CU    |
+| ChReqD |    CD    |    E1    |    E1    |    E1    |
+| ChReqL |    E1    |    CL    |    E1    |    E1    |
+| ChReqR |    E1    |    CR    |    E1    |    E1    |
+|--------|-------------------------------------------|
+	events: 
+StReq -- state request by client
+ChReqU -- 'change to UP state' request by client
+ChReqD -- 'change to DOWN state' request by client
+ChReqL -- 'change to LEFT state' request by client
+ChReqR -- 'change to RIGHT state' request by client
+
+		actions:
+R1 -- response with current state
+E1 -- error switching state due to unspecified workflow
+CU -- switch(change) to UP state
+CD -- switch(change) to DOWN state
+CL -- switch(change) to LEFT state 
+CR -- switch(change) to RIGHT state
+
+		data model:
+fsm
+	-> state
+state
+	name
+		DOWN, UP, LEFT, RIGHT
+	possible
+	next
+error
+
+		state model:
+|------------------------------------------------------|
+|          |                    state                  |
+|          |-------------------------------------------|
+|          |    UP    |   DOWN   |   LEFT   |  RIGHT   |
+|----------|-------------------------------------------|
+| current  |    U     |    D     |    L     |    R     |
+| possible |   D00    |   LRU    |   U00    |   U00    |
+| next     |   0..2   |   0..2   |   0..2   |   0..2   |
+|----------|-------------------------------------------|
+
+		extern interface:
+***init
+	input: []
+	output:
+		side_effect: [fsm]
+			return: [error]
+		
+fsm_current_state_name
+	input: [&state.name]
+	output:
+		side_effect: [state.name]
+		return: [error]
+fsm_switch_state
+	input: [state.name]
+	output:
+		side_effect: [state]
+		return: [error]
+***destroy
+	input: [fsm]
+	output:
+		side_effect: [fsm]
+		return: [error]
+
+		static service:
+set_next
+	input: [state.name]
+	output:
+		side_effect: [state.name]
+		return: [error]
+switch
+	input: [state]
+	output:
+		side_effect: [state]
+		return: [error]
+check_error
+	input: [state]
+	output:
+		side_effect:
+		return: [error]
+check_fsm
+	input: [fsm]
+	output:
+		side_effect:
+		return: [error]
