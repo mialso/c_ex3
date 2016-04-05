@@ -1,11 +1,15 @@
 
 	general
 log-module
-	// for now just print to stderr with [LOG] prefix
+	*  every fsm operation logging
+	** error logging
+
 server-module
 client-module
 
 	fsm-module
 *testing
 	** add full logic to test all possible cases
+*main logic
+	* matrix: add state after action and make tests according to that technique
 

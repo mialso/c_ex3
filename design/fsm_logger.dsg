@@ -1,0 +1,41 @@
+		fsm_logger design document
+	functional requirements:
+fsm_logger must help client to store data about operations
+
+	data model:
+operation	// implement as a line, 64 chars (so 63 bytes max data size + '\n')
+	time:
+		???format -- msec from fsm start, conversion to human-readable by demand (may be as option)
+	client_id:
+		??? do i realy need this??? may be just port number
+	op_type:
+		[R] || [C] 	// according to fsm matrix actions 'request' 'change'
+	fsm_state:
+		U | D | L | R | E   	// as fsm matrix 'up', 'down', 'left', 'right', 'empty' --- ??? about last
+	//optional
+	error:
+		[E]
+	error_code:
+		??? how to present error - just int num or short description???
+	end_of_line:
+		['\n']
+
+	interface:
+log
+	input: [client_id(port), op_type, fsm_state, error_code]
+	output:
+
+	service:
+add_operation
+init_file
+
+	storage:
+linked list with maximum capacity of 10,240 operations = max 655,360 bytes
+phisicaly stored in a file with fsm.log name
+truncated on machine start
+memory mapped
+	
+	memory management:
+storage allocation on per-page size or... 8192 may be a good simple choice, operation size 64 byte,
+so 80 mem allocations and 128 operations per allocation
+... or maybe allocate it all at once
