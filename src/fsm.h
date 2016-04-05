@@ -1,9 +1,11 @@
 #ifndef _MLS_FSM_H
 #define _MLS_FSM_H
 
+#include <stddef.h>
+
 // declarations
 enum fsm_state_name {
-	EMPTY, 		// 0 bt default
+	EMPTY, 		// 0 by default
 	DOWN = 68,	// ansi 'D'
 	LEFT = 76,	// ansi 'L'
 	RIGHT = 82,	// ansi 'R'
@@ -12,20 +14,15 @@ enum fsm_state_name {
 
 struct fsm_state {
 	enum fsm_state_name name;
+	enum fsm_state_name possible[3];
+	size_t next;
 };
-/*struct fsm {
-	struct fsm_state *state;
-};*/
 
 // definitions
 struct fsm_state real_state;
-/*struct fsm real_machine;*/
 
 // interface declaration
-int fsm_current_state_name(enum fsm_state_name *name);
-
-// service declarations
-void check_fsm() __attribute__ ((noreturn));
-void log_error() __attribute__ ((noreturn));
+extern int fsm_current_state_name(enum fsm_state_name *name);
+extern int fsm_switch_state(enum fsm_state_name name);
 
 #endif

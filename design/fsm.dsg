@@ -18,7 +18,7 @@ ChReqD -- 'change to DOWN state' request by client
 ChReqL -- 'change to LEFT state' request by client
 ChReqR -- 'change to RIGHT state' request by client
 
-		actions:
+	actions:
 R1 -- response with current state
 E1 -- error switching state due to unspecified workflow
 CU -- switch(change) to UP state
@@ -26,7 +26,7 @@ CD -- switch(change) to DOWN state
 CL -- switch(change) to LEFT state 
 CR -- switch(change) to RIGHT state
 
-		data model:
+	data model:
 fsm
 	-> state
 state
@@ -36,7 +36,7 @@ state
 	next
 error
 
-		state model:
+	state model:
 |------------------------------------------------------|
 |          |                    state                  |
 |          |-------------------------------------------|
@@ -47,12 +47,7 @@ error
 | next     |   0..2   |   0..2   |   0..2   |   0..2   |
 |----------|-------------------------------------------|
 
-		extern interface:
-***init
-	input: []
-	output:
-		side_effect: [fsm]
-			return: [error]
+	extern interface:
 		
 fsm_current_state_name
 	input: [&state.name]
@@ -64,24 +59,19 @@ fsm_switch_state
 	output:
 		side_effect: [state]
 		return: [error]
-***destroy
-	input: [fsm]
-	output:
-		side_effect: [fsm]
-		return: [error]
 
-		static service:
-set_next
-	input: [state.name]
-	output:
-		side_effect: [state.name]
-		return: [error]
-switch
+	static service:
+switch_state
 	input: [state]
 	output:
 		side_effect: [state]
 		return: [error]
-check_error
+set_possible
+	input: [state]
+	output:
+		side_effect: [state.possible]
+		return: [error]
+log_error
 	input: [state]
 	output:
 		side_effect:

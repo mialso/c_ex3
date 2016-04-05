@@ -8,6 +8,5 @@ struct test {
 };
 
 void tests_print_res(struct test test_passed);
-void perform_test(struct test test_me, char *name, void *proc);
 
 #endif

@@ -1,0 +1,11 @@
+
+	general
+log-module
+	// for now just print to stderr with [LOG] prefix
+server-module
+client-module
+
+	fsm-module
+*testing
+	** add full logic to test all possible cases
+

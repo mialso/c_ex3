@@ -2,9 +2,9 @@
 #include "tests.h"
 
 // static declarations
-void print_error(struct test test_passed);
-void print_success(struct test test_passed);
-void print_internal_tests_error(struct test test_passed);
+static void print_error(struct test test_passed);
+static void print_success(struct test test_passed);
+static void print_internal_tests_error(struct test test_passed);
 
 void tests_print_res(struct test test_passed)
 {
@@ -20,13 +20,13 @@ void tests_print_res(struct test test_passed)
 
 void print_error(struct test test_passed)
 {
-	fprintf(stderr, "[test]: %s ERROR: %s\n", test_passed.name, test_passed.error_message); 
+	fprintf(stderr, "[TEST]: %s ERROR: %s\n", test_passed.name, test_passed.error_message); 
 }
 void print_success(struct test test_passed)
 {
-	printf("[test]: %s PASSED\n", test_passed.name); 
+	printf("[TEST]: %s PASSED\n", test_passed.name); 
 }
 void print_internal_tests_error(struct test test_passed)
 {
-	fprintf(stderr, "[test]: INTERNAL ERROR while %s\n", test_passed.name);
+	fprintf(stderr, "[TEST]: INTERNAL ERROR while %s\n", test_passed.name);
 }
