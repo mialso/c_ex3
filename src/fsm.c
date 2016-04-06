@@ -16,7 +16,7 @@ static enum fsm_error_name fsm_error;
 
 // jumps stuff
 jmp_buf do_again;
-int guard;
+int guard; // remove TODO
 
 int fsm_current_state_name(enum fsm_state_name *name)
 {

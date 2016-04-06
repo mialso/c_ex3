@@ -19,23 +19,12 @@ operation	// implement as a line, 64 chars (so 63 bytes max data size + '\n')
 		??? how to present error - just int num or short description???
 	end_of_line:
 		['\n']
+	**example:
+ 		[0003234 55789 R U   <                                          > ]
+ 		[0003236 55789 C U E <impossible state change request           > ]
 
 	interface:
-log
+fsm_log
 	input: [client_id(port), op_type, fsm_state, error_code]
-	output:
 
-	service:
-add_operation
-init_file
 
-	storage:
-linked list with maximum capacity of 10,240 operations = max 655,360 bytes
-phisicaly stored in a file with fsm.log name
-truncated on machine start
-memory mapped
-	
-	memory management:
-storage allocation on per-page size or... 8192 may be a good simple choice, operation size 64 byte,
-so 80 mem allocations and 128 operations per allocation
-... or maybe allocate it all at once

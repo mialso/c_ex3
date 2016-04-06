@@ -1,8 +1,9 @@
 
 	general
 log-module
-	*  every fsm operation logging
 	** error logging
+*testing
+	** implement tests for static procedures
 
 server-module
 client-module
