@@ -3,8 +3,9 @@
 
 struct test {
 	char *name;
-	int result;
 	char *error_message;
+	int result;
+	int error_num;
 };
 
 void tests_print_res(struct test test_passed);

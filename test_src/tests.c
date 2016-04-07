@@ -20,7 +20,7 @@ void tests_print_res(struct test test_passed)
 
 void print_error(struct test test_passed)
 {
-	fprintf(stderr, "[TEST]: %s ERROR: %s\n", test_passed.name, test_passed.error_message); 
+	fprintf(stderr, "[TEST]: %s ERROR: %s, error_num = %d\n", test_passed.name, test_passed.error_message, test_passed.error_num); 
 }
 void print_success(struct test test_passed)
 {
