@@ -5,7 +5,8 @@ enum fsm_server_error_name {
 	OK,
 	// initialization errors
 	INIT_LISTENER_ERR,
-	SELECT_ERR,
+	PIPE_INIT_ERR,
+	SIGNAL_INIT_ERR,
 	ACCEPTION_FAIL
 };
 

@@ -9,5 +9,6 @@ struct test {
 };
 
 void tests_print_res(struct test test_passed);
+void fill_failed_test(struct test *test, int err_num);
 
 #endif

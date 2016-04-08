@@ -19,6 +19,7 @@ struct fsm_server_sock_list {
 
 // interface
 int sock_list_push(struct fsm_server_sock_list *list, int sd);
+int sock_list_pop(struct fsm_server_sock_list *list, int *sd);
 int sock_list_remove(struct fsm_server_sock_list *list, int sd);
 int sock_node_move(struct fsm_server_sock_list * restrict l_from, 
 			struct fsm_server_sock_list * restrict l_to, int sd);

@@ -1,146 +1,69 @@
-#include "tests.h"
 #include <stdio.h>
-#include <stdlib.h>
+#include <unistd.h>
 
-#include "../src/fsm_server_socket.h"
+#include "tests.h"
 
-// tests objects
+#include "../src/server_socket.h"
+
+// tests data
 static struct test test_one;
-static struct test test_two;
 
-// static resources
-static struct fsm_server_sock_list list_one;
-static struct fsm_server_sock_list list_two;
+// tests procs
+static void test_get_passive_socket();
 
-// tests declarations
-static void test_sock_list_push();
-static void test_sock_list_move();
+// tests resources
+static int socket;
 
 int main(void)
 {
-	test_one.name = "sock_list_push";
+	test_get_passive_socket();
+	return 0;
+}
+void test_get_passive_socket()
+{
+	// test resources
+	int port_num_in, port_num_out;
+	// test with defined wright port number
+	test_one.name = "get_passive_socket with wright port number";
 	test_one.result = 1;
-	test_sock_list_push();
-	
-	test_two.name = "sock_node_move";
-	test_two.result = 1;
-	test_sock_list_move();
-	
-	exit(EXIT_SUCCESS);
-}
-void test_sock_list_push()
-{
-	int sd_1 = 123;
-	int sd_2 = 34;
-	int sd_3 = 0;
-	int res;
+	port_num_in = 51234;
+	port_num_out = port_num_in;
+	if (-1 == (socket = get_passive_socket(&port_num_out))) {
+		fill_failed_test(&test_one, -1);
+ 	}
+	if (port_num_in != port_num_out) {
+		test_one.error_message = "port numbers are not equal";
+		fill_failed_test(&test_one, socket);
+	}
+	tests_print_res(test_one);
 
-	res = sock_list_push(&list_one, sd_1);
-	if (res) {
-		test_one.result = 0;
-		test_one.error_message = "sock_list_push error";
-		test_one.error_num = res;
+	// test with defined wrong port number
+	test_one.name = "get_passive_socket with wrong port number";
+	test_one.result = 1;
+	port_num_in = 45544;
+	port_num_out = port_num_in;
+	if (-1 == (socket = get_passive_socket(&port_num_out))) {
+		fill_failed_test(&test_one, -1);
+ 	}
+	if (port_num_in == port_num_out) {
+		test_one.error_message = "port numbers are equal";
+		fill_failed_test(&test_one, port_num_out);
 	}
 	tests_print_res(test_one);
-	res = sock_list_push(&list_one, sd_1);
-	if (7 != res) {
-		test_one.result = 0;
-		test_one.error_message = "sock_list_push the same value error";
-		test_one.error_num = res;
+	
+	// test with undefined port number
+	test_one.name = "get_passive_socket without port number";
+	test_one.result = 1;
+	port_num_out = 0;
+	if (-1 == (socket = get_passive_socket(&port_num_out))) {
+		fill_failed_test(&test_one, -1);
+ 	}
+	if (0 == port_num_out) {
+		test_one.error_message = "port number is 0";
+		fill_failed_test(&test_one, socket);
 	}
 	tests_print_res(test_one);
-	res = sock_list_push(&list_one, sd_2);
-	if (res) {
-		test_one.result = 0;
-		test_one.error_message = "second sock_list_push error";
-		test_one.error_num = res;
+	if (socket) {
+		close(socket);
 	}
-	tests_print_res(test_one);
-	res = sock_list_push(&list_one, sd_3);
-	if (2 != res) {
-		test_one.result = 0;
-		test_one.error_message = "sock_list_push sd = 0 error";
-		test_one.error_num = res;
-	}
-	tests_print_res(test_one);
-	res = sock_list_remove(&list_one, sd_1);
-	if (res) {
-		test_one.result = 0;
-		test_one.error_message = "sock_list_remove error";
-		test_one.error_num = res;
-	}
-	tests_print_res(test_one);
-	res = sock_list_remove(&list_one, sd_3);
-	if (3 != res) {
-		test_one.result = 0;
-		test_one.error_message = "sock_list_remove absent node error";
-		test_one.error_num = res;
-	}
-	tests_print_res(test_one);
-	res = sock_list_remove(&list_one, sd_2);
-	if (res) {
-		test_one.result = 0;
-		test_one.error_message = "sock_list_remove last node error";
-		test_one.error_num = res;
-	}
-	tests_print_res(test_one);
-	if ((NULL == list_one.first) && (NULL == list_one.last)) {
-		test_one.result = 1;
-		test_one.error_message = NULL;
-	}
-	else {
-		test_one.result = 0;
-		test_one.error_message = "test_one list not empty";
-	}
-	tests_print_res(test_one);
-}
-static void test_sock_list_move()
-{
-	int i;
-	int res;
-
-	for (i = 1; i < 11; ++i) {
-		res = sock_list_push(&list_one, i);
-		if (res) {
-			test_two.result = 0;
-			test_two.error_message = "sock_list_push error";
-			test_two.error_num = res;
-		}
-	}
-	tests_print_res(test_two);
-	res = sock_node_move(&list_one, &list_two, 2);
-	if (res) {
-		test_two.result = 0;
-		test_two.error_message = "sock_node_move error";
-		test_two.error_num = res;
-	}
-	tests_print_res(test_two);
-	res = sock_node_move(&list_one, &list_two, 5);
-	if (res) {
-		test_two.result = 0;
-		test_two.error_message = "sock_node_move error";
-		test_two.error_num = res;
-	}
-	tests_print_res(test_two);
-	res = sock_node_move(&list_one, &list_two, 10);
-	if (res) {
-		test_two.result = 0;
-		test_two.error_message = "sock_node_move error";
-		test_two.error_num = res;
-	}
-	tests_print_res(test_two);
-	res = sock_list_remove(&list_two, 5);
-	if (res) {
-		test_two.result = 0;
-		test_two.error_message = "sock_node_remove error";
-		test_two.error_num = res;
-	}
-	tests_print_res(test_two);
-	res = sock_list_remove(&list_one, 5);
-	if (3 != res) {
-		test_two.result = 0;
-		test_two.error_message = "sock_node_remove error";
-		test_two.error_num = res;
-	}
-	tests_print_res(test_two);
 }

@@ -1,6 +1,6 @@
 #include <stdio.h>
 #include <stddef.h>
-#include "fsm_server_socket.h"
+#include "server_socket_list.h"
 
 #define NODE_SIZE sizeof(struct fsm_server_sock_node)
 
@@ -87,6 +87,16 @@ int sock_node_move(struct fsm_server_sock_list * restrict l_from,
 		return res;
 	}
 	return 0;
+}
+int sock_list_pop(struct fsm_server_sock_list *list, int *sd)
+{
+	if (list->last) {
+		*sd = list->last->sd;
+		return 0; 	// OK
+	}
+	else {
+		return 5; 	// empty list
+	}
 }
 int remove_node(struct fsm_server_sock_list *list, struct fsm_server_sock_node *node)
 {
