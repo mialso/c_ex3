@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include "tests.h"
 #include "../src/fsm_logger.h"
+#include "../src/fsm_logger_error.h"
 
 
 // tests definition
@@ -35,12 +36,16 @@ void test_fsm_log(struct test *test)
 	test->name = "fsm_log";
 	test->result = 0;
 	
-	if (0 == (res = fsm_log(1000, 'S', 'U', 0))) {
+	if (0 == (res = fsm_log(1000, 'S', 'U', ' '))) {
 		test->result = 1;
 	}
 	else {
 		test->result = 0;
 		test->error_message = "fsm_log failed to return success";
+	}
+	if (OK != fsm_logger_flush_logs()) {
+		test->result = 0;
+		test->error_message = "fsm_log failed to flush results";
 	}
 	
 	tests_print_res(*test);
@@ -57,6 +62,10 @@ void test_fsm_log_err(struct test *test)
 	else {
 		test->result = 0;
 		test->error_message = "fsm_log failed to return success";
+	}
+	if (OK != fsm_logger_flush_logs()) {
+		test->result = 0;
+		test->error_message = "fsm_log failed to flush results";
 	}
 	
 	tests_print_res(*test);

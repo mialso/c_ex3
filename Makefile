@@ -62,8 +62,8 @@ test_fsm_logger: $(fsm_logger_objs)
 	$(CC) -o ./bin/tests/test_fsm_logger $^
 	@echo "... test with some delay ... about 5 seconds, please be patient ..."
 	./bin/tests/test_fsm_logger
-	cat fsm.log
-	rm ./fsm.log
+	cat ./bin/fsm.log
+	rm ./bin/fsm.log
 	make clean_tests
 test_fsm_logger.o: %.o: %.c
 	$(CC) -c $(TEST_FLAGS) $< -o $@

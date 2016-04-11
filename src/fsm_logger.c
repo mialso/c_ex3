@@ -11,11 +11,9 @@
 #include "fsm_logger.h"
 #include "fsm_logger_error.h"
 
-#define LOG_FILE_PATH "./fsm.log"
+#define LOG_FILE_PATH "./bin/fsm.log"
 
-// file definition
-//static FILE *log_file;
-int fsm_log_file;
+// static definitions
 static uint16_t start_time;
 static struct fsm_operation *first_op;
 
@@ -29,7 +27,6 @@ static enum fsm_logger_error_name logger_error;
 // service
 static __attribute__ ((noreturn)) void get_log_file();
 static uint16_t get_logger_time(void);
-//static void print_log(void);
 static void update_operation(int client_id, char type, char state, char error);
 static void close_file(void);
 static void print_internal_logger_error(enum fsm_logger_error_name err);
@@ -47,8 +44,6 @@ int fsm_log(int client_id, char type, char state, char error)
 	// main logic, file initialization on first call
 	if (fsm_log_file) {
 		update_operation(client_id, type, state, error);
-		//print_log();
-		//fsync(fileno(log_file));
 		return OK;
 	}
 	else {
@@ -73,7 +68,6 @@ int fsm_logger_flush_logs()
 // service definitions
 struct fsm_operation *flush_one(struct fsm_operation *op, int *res)
 {
-	printf("[INFO]: fsm_logger: flush_one \n");
 	char buf[64] = {'\0'};
 	struct fsm_operation *tmp;
 	if (64 != (*res = sprintf(
@@ -131,56 +125,25 @@ void update_operation(int client_id, char type, char state, char error)
 		first_op = op;
 	}
 	
-	/*current_op.time = get_logger_time();
-	current_op.client_id = client_id;
-	current_op.type = type;
-	current_op.state = state;
-	current_op.error = (error) ? error : ' ';*/
-
 	// TODO implement error message
-	error_message = (error) ? "...not implemented yet..." : "";
-	printf("[INFO]: fsm_logger: update_operation \n");
+	error_message = (error != ' ') ? "...not implemented yet..." : "";
 }
-/*void print_log()
-{
-	int length = 0;
-	if (64 == (length = fprintf(
-				log_file, 
-				"%05d %05d %c %c %c <%-43s>\n", 
-				current_op.time, 
-				current_op.client_id, 
-				current_op.type, 
-				current_op.state, 
-				current_op.error, 
-				error_message))) 
-	{
-		printf("[INFO]: fsm_logger: print_log suc = %d\n", length);
-		return;
-	}
-	else {
-		printf("[INFO]: fsm_logger: print_log err = %d\n", length);
-		longjmp(do_again, OUTPUT_ERROR);
-	}
-}*/
 
 void get_log_file()
 {
 	static int init_attempt = FILE_INIT;
 	int result = 0;
-	//if (NULL == (log_file = fopen(LOG_FILE_PATH, "w"))) {
 	if (-1 == (fsm_log_file = open(LOG_FILE_PATH, O_CREAT | O_WRONLY | O_TRUNC | O_NONBLOCK, S_IRUSR | S_IWUSR))) {
 		result = FILE_ERROR;
 		perror("fsm_logger: get_log_file() open error");
 	}
 	else {
 		// file initialization
-		printf("[INFO]: fsm_logger: get_log_file file init = %d\n", init_attempt);
 		atexit(close_file);
 		result = init_attempt++; // only one init allowed, to prevent infinite loop in enormous case
 		start_time = get_logger_time();
 	}
 	// jump to handler with error code
-	printf("[INFO]: fsm_logger: get_log_file result = %d\n", result);
 	longjmp(do_again, result);
 }
 uint16_t get_logger_time()
@@ -208,7 +171,5 @@ void print_internal_logger_error(enum fsm_logger_error_name err)
 }
 void close_file(void)
 {
-	//fclose(log_file);
-	//fsm_logger_flush_logs();
 	close(fsm_log_file);
 }

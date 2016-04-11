@@ -25,6 +25,7 @@
 	make test_<module_name>		|
 
 	*** libs used(dependencies): -lrt
+	*** fsm_log file:  ./bin/fsm.log
 	
 #### implementation notes
 	imperative programming technique used: 
@@ -37,3 +38,4 @@
 	resource management
 		- init during first call to 'make smth'
 		- destroy at 'atexit' handlers
+

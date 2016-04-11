@@ -15,11 +15,11 @@
 * add fatal_error each module error-names
 
 	<client-module>
-* refactor logic and add malicious procs
+* refactor logic and add misbehaving procs
 
 	<fsm-module>
-*logging
-	add logging functionality
+**logging
+	** add client id to logs
 ***testing
 	** add full logic to test all possible cases
 ***main logic
