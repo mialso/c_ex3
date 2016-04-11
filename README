@@ -1,1 +1,38 @@
-### empty readme
+### fsm server and client programs
+
+#### general overview
+	fsm modules:
+		-- fsm (finite state machine)
+		---- fsm_logger
+	
+	server modules:
+		-- server
+		---- server_sockets
+		---- server_socket_list
+		---- server_timer
+	client modules:
+		-- client
+
+	*** see 'design/<module>.dsg' for details
+
+#### build
+	make all			|
+	make server			|	output: ./bin 
+	make client			|
+
+	make tests			|	output: ./bin/tests
+	make test_<module_name>		|
+
+	*** libs used(dependencies): -lrt
+	
+#### implementation notes
+	imperative programming technique used: 
+		- most resources are stored as static to files (BSS segment)
+		- procs data output is handled via side effects	
+		- return values are used to indicate errors
+	error handling:
+		- longjumps in most 'lib'-modules static void procs
+		- return values, where '0' equals OK and 'all positive' means some error
+	resource management
+		- init during first call to 'make smth'
+		- destroy at 'atexit' handlers

@@ -37,8 +37,6 @@ int sock_list_push(struct fsm_server_sock_list *list, int sd)
 				node->prev = list->last;
 				list->last = node;
 			}
-			//++(list->count);
-			//list->count++;
 			return 0;
 		}
 		else {
@@ -150,6 +148,8 @@ int remove_node(struct fsm_server_sock_list *list, struct fsm_server_sock_node *
 	else {
 		return 6;	// corrupted list
 	}
+
 	free(node);
+
 	return 0; 	// OK
 }

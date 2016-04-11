@@ -20,7 +20,7 @@ jmp_buf do_again;
 static enum fsm_logger_error_name logger_error;
 
 // service
-static void get_log_file() __attribute__ ((noreturn));
+static __attribute__ ((noreturn)) void get_log_file();
 static uint16_t get_logger_time();
 static void print_log();
 static void update_operation(int client_id, char type, char state, char error);

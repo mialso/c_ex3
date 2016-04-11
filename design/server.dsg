@@ -1,32 +1,43 @@
 		server design doc
-	server purpose:
+	[server purpose]:
 * to help fsm provide its state to connected clients and to receive state-change requests
-	functional requirements:
+	[functional requirements]:
 * serve as many connections as many system resources available
 * serve connections on a fair base, dont stuck at one
 * one single-threaded process
-	usage:
+	[usage]:
 FSMserver <port>
 
-	data model
+	[data model]
 server_socket
 client_socket
 	state:
 		accepted 	// connection accepted, new fd created
-		in_queue	// connection get_state_request received
-		primary		// connection state_response sent, waiting for switch_state request 
+		in_queue	// connection get_state_request received, wait to be served
+		sr_primary	// connection state_response sending 
+		cs_primary	// connection state_change_req waiting 
+		cr_primary	// connection state_change response sending 
 error
 signal
 	pipe
+timer
 
-	workflow
-init_environment
+	[workflow]
+init_environment		// get & validate input information from user
+	usage_informer
 init_listener
+init_pipe 	// signals included
+start_timer
+
 main loop:
 	wait_all
+	handle_signals
 	accept_connections
-	wait_primary
+	respond_accepted
+	handle_primary
 
-	service:
-error_handler
-usage_informer
+	[concepts]
+* non-blocking IO
+* timer to check old connections and remove them
+* wrong messages make server to close the spamming socket
+* self-pipe signals handling (just for curiousity)

@@ -1,4 +1,5 @@
 TEST_FLAGS = -g -std=c11 -Wall -Wextra -Wpedantic -D_POSIX_C_SOURCE=200809L
+LIBS = -lrt
 vpath %.c ./src
 vpath %.h ./src
 vpath %.c ./test_src
@@ -19,7 +20,7 @@ all:
 	@echo "all invoked, no logic implemented yet"
 
 server: $(server_objs)
-	$(CC) -o ./bin/FSMserver $^ -lrt
+	$(CC) -o ./bin/FSMserver $^ $(LIBS)
 client: $(client_objs)
 	$(CC) -o ./bin/FSMclient $^
 
@@ -59,7 +60,9 @@ test_fsm.o: %.o: %.c
 # fsm_logger related tests
 test_fsm_logger: $(fsm_logger_objs)
 	$(CC) -o ./bin/tests/test_fsm_logger $^
+	@echo "... test with some delay ... about 5 seconds, please be patient ..."
 	./bin/tests/test_fsm_logger
+	rm ./fsm.log
 	make clean_tests
 test_fsm_logger.o: %.o: %.c
 	$(CC) -c $(TEST_FLAGS) $< -o $@

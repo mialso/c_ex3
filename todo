@@ -1,16 +1,27 @@
 
-	general
-log-module
+	[general]
+*log-module
 	** error logging
-*testing
+*resource management
+	* provide 'atexit' handlers to all 
+**testing
+	*  implement multiple-client testing
 	** implement tests for static procedures
 
-server-module
-client-module
+	<server-module>
+* refactor signals and pipe to module
+* refactor <*>_primary sockets to work with *nodes instead of int's, logic
+* implement ttl, signal handler functionality
+* add fatal_error each module error-names
 
-	fsm-module
-*testing
+	<client-module>
+* refactor logic and add malicious procs
+
+	<fsm-module>
+*logging
+	add logging functionality
+***testing
 	** add full logic to test all possible cases
-*main logic
+***main logic
 	* matrix: add state after action and make tests according to that technique
 
