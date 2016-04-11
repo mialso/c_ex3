@@ -7,11 +7,12 @@
 	
 	server modules:
 		-- server
-		---- server_sockets
+		---- server_socket
 		---- server_socket_list
 		---- server_timer
 	client modules:
 		-- client
+		---- client_socket
 
 	*** see 'design/<module>.dsg' for details
 

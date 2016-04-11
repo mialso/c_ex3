@@ -6,7 +6,8 @@ enum fsm_error_name {
 	INIT,
 	WRONG_STATE_NAME,
 	IMPOSSIBLE_STATE,
-	FSM_MATRIX_ERROR
+	FSM_MATRIX_ERROR,
+	FSM_LOGGER_ERROR
 };
 
 #endif

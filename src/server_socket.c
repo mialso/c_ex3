@@ -134,7 +134,7 @@ int is_partial(int socket, int mes_size)
 		return 1; 	// error
 	}
 	if (ready_size < mes_size) {
-		printf("[LOG]: server_socket: partial message of size=%d '%s', sock = %d\n",ready_size, buf, socket);
+		//printf("[LOG]: server_socket: partial message of size=%d '%s', sock = %d\n",ready_size, buf, socket);
 		return 2;	// partial message
 	}
 	return 0;

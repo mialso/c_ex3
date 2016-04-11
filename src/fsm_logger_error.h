@@ -5,7 +5,9 @@ enum fsm_logger_error_name {
 	OK,
 	FILE_INIT,
 	FILE_ERROR,
+	MEMORY_ERROR,
 	CLOCK_ERROR,
+	CONVERT_ERROR,
 	OUTPUT_ERROR
 };
 

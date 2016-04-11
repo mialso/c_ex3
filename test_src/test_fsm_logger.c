@@ -35,7 +35,7 @@ void test_fsm_log(struct test *test)
 	test->name = "fsm_log";
 	test->result = 0;
 	
-	if (0 == (res = fsm_log(111, 80, 65, 0))) {
+	if (0 == (res = fsm_log(1000, 'S', 'U', 0))) {
 		test->result = 1;
 	}
 	else {
@@ -48,7 +48,7 @@ void test_fsm_log(struct test *test)
 void test_fsm_log_err(struct test *test)
 {
 	int res;
-	test->name = "fsm_log";
+	test->name = "fsm_log error";
 	test->result = 0;
 	
 	if (0 == (res = fsm_log(222, 80, 65, 89))) {

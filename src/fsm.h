@@ -24,5 +24,6 @@ struct fsm_state real_state;
 // interface declaration
 extern int fsm_current_state_name(enum fsm_state_name *name);
 extern int fsm_switch_state(enum fsm_state_name name);
+extern int fsm_flush_logs();
 
 #endif

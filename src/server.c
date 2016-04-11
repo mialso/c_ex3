@@ -1,6 +1,6 @@
 #include <stdio.h>
-#include <stdlib.h>
 #include <unistd.h>		// close
+#include <stdlib.h>
 #include <setjmp.h>
 #include <fcntl.h>
 #include <errno.h>
@@ -24,6 +24,8 @@
 #define REQ_ST_MES_SIZE 2
 #define REQ_CH_MES_SIZE 3
 
+// wide available log file descriptor
+extern int fsm_log_file;
 // static resources
 static int port_num;
 static int server_socket;
@@ -63,6 +65,7 @@ static void handle_signals();
 static void accept_connections();
 static void respond_accepted();
 static void handle_primary();
+static void handle_fsm_logs();
 static void serv_log(char *mes, int data);
 static void fatal_error();
 static void add_accepted_socks();
@@ -107,6 +110,7 @@ int main(int argc, char *argv[])
 		respond_accepted();
 	
 		handle_primary();
+		handle_fsm_logs();
 	}
 }
 void init_env(int argc, char *argv[])
@@ -226,6 +230,10 @@ void wait_all()
 	if (cr_primary_sock) {
 		FD_SET(cr_primary_sock, &write_set);
 		max_sd = (max_sd > cr_primary_sock) ? max_sd : cr_primary_sock;
+	}
+	if (fsm_log_file) {
+		FD_SET(fsm_log_file, &write_set);
+		max_sd = (max_sd > fsm_log_file) ? max_sd : fsm_log_file;
 	}
 	act = select(max_sd + 1, &main_set, &write_set, NULL, NULL);
 	if ((0 > act) && (errno != EINTR)) {
@@ -459,6 +467,17 @@ void handle_primary()
 	handle_cr_primary();
 	serv_log("handle_primary ....end", 0);
 }
+void handle_fsm_logs()
+{
+	if (!fsm_log_file) {
+		return;
+	}
+	if (FD_ISSET(fsm_log_file, &write_set)) {
+		if (OK != fsm_flush_logs()) {
+			fatal_error();
+		}
+	}
+}
 /*void handle_primary() {
 	enum fsm_state_name conv;	// for enum conversion???
 	enum fsm_state_name resp;
@@ -510,7 +529,7 @@ set_primary:
 }*/
 void serv_log(char *mes, int data)
 {
-	fprintf(stderr, "[LOG]: fsm_server: %s, %d\n", mes, data);
+	//fprintf(stderr, "[LOG]: fsm_server: %s, %d\n", mes, data);
 }
 void fatal_error()
 {

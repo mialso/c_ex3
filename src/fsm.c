@@ -2,13 +2,19 @@
 #include <stdio.h>
 #include "fsm.h"
 #include "fsm_error.h"
+#include "fsm_logger.h"
+
+#define STATE_REQ 'S'
+#define STATE_CHANGE 'C'
+#define STATE_ERROR 'E'
+#define STATE_NO_ERROR ' '
 
 // internal declarations
 static void switch_state(enum fsm_state_name name);
 //static void update_possible();
 static void set_possible(enum fsm_state_name one, enum fsm_state_name two, enum fsm_state_name three);
 static void check_fsm() __attribute__ ((noreturn));
-static void log_error(); 	// TODO implement logging
+//static void log_error(); 	// TODO implement logging
 
 // error handling stuff
 static enum fsm_error_name fsm_error;
@@ -16,19 +22,22 @@ static enum fsm_error_name fsm_error;
 
 // jumps stuff
 jmp_buf do_again;
-int guard; // remove TODO
 
 int fsm_current_state_name(enum fsm_state_name *name)
 {
 	// error handler initialization
 	fsm_error = setjmp(do_again);
 	if (INIT < fsm_error) {
-		log_error();
 		return fsm_error;
 	}
 	
 	*name = real_state.name;
 	if (*name) {
+		printf("[INFO]: fsm: fsm_current state name OK\n");
+		if (OK != fsm_log(1000, STATE_REQ, real_state.name, STATE_NO_ERROR)) {
+			fsm_error = FSM_LOGGER_ERROR;
+			return fsm_error;
+		}
 		return OK;
 	}
 	else {
@@ -42,20 +51,28 @@ int fsm_switch_state(enum fsm_state_name name)
 	// error handler initialization
 	fsm_error = setjmp(do_again);
 	if (INIT < fsm_error) {
-		log_error();
 		return fsm_error;
 	}
 	// searching for requested state_name in possible values for current state and switch
 	for (i = 0; i < 3; ++i) {
 		if (name == real_state.possible[i]) {
 			switch_state(name);
+			if (OK != fsm_log(1000 , STATE_CHANGE, real_state.name, STATE_NO_ERROR)) {
+				fsm_error = FSM_LOGGER_ERROR;
+				return fsm_error;
+			}
 			return OK;
 		}
 	}
 	// no match among possible state names was found, error
 	fsm_error = IMPOSSIBLE_STATE;
-	log_error();
 	return IMPOSSIBLE_STATE;
+}
+int fsm_flush_logs()
+{
+	int res;
+	res = fsm_logger_flush_logs();
+	return res;
 }
 void switch_state(enum fsm_state_name name)
 {
@@ -102,9 +119,4 @@ void check_fsm()
 	// else init new machine and jump to make next attempt to fetch state name
 	switch_state(DOWN);
 	longjmp(do_again, INIT);
-}
-void log_error()
-{
-	// log
-	fprintf(stderr, "[LOG]: fsm internal error: %d\n", fsm_error);
 }

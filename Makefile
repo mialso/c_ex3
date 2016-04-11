@@ -17,7 +17,7 @@ server_socket_list_objs = server_socket_list.o test_server_socket_list.o tests.o
 client_socket_objs = client_socket.o server_socket.o test_client_socket.o tests.o
 
 all:
-	@echo "all invoked, no logic implemented yet"
+	@echo "all invoked, no logic implemented yet, try 'server' or 'client'"
 
 server: $(server_objs)
 	$(CC) -o ./bin/FSMserver $^ $(LIBS)
@@ -62,6 +62,7 @@ test_fsm_logger: $(fsm_logger_objs)
 	$(CC) -o ./bin/tests/test_fsm_logger $^
 	@echo "... test with some delay ... about 5 seconds, please be patient ..."
 	./bin/tests/test_fsm_logger
+	cat fsm.log
 	rm ./fsm.log
 	make clean_tests
 test_fsm_logger.o: %.o: %.c
