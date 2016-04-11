@@ -1,0 +1,17 @@
+		client design doc
+	[the purpose]:
+* i think the only meaning is for testing the server and fsm itself
+	[functional requirements]:
+* connect to server, request state, receive response, request state change, receive response
+
+	[data model]:
+socket
+state
+
+	[workflow]:
+connect to server
+request state
+	receive response
+request state change
+	receive response
+disconnect

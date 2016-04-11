@@ -10,15 +10,19 @@
 #include <sys/socket.h>
 #include <sys/types.h>
 //#include <arpa/inet.h>
+#include <time.h>
 
 #include <signal.h>
 
 #include "server_error.h"
 #include "server_socket.h"
+#include "server_timer.h"
 #include "server_socket_list.h"
 #include "fsm.h"
+//#include "fsm_error.h"
 
-#define MESSAGE_SIZE 3
+#define REQ_ST_MES_SIZE 2
+#define REQ_CH_MES_SIZE 3
 
 // static resources
 static int port_num;
@@ -26,12 +30,19 @@ static int server_socket;
 //static struct sockaddr_in address;
 //static socklen_t addr_len;
 static fd_set main_set;
+static fd_set write_set;
 //static fd_set primary_set;
 //static int accepted_sock_num;
 static struct fsm_server_sock_list accepted_socks;
 static struct fsm_server_sock_list pre_primary_socks;
-static int primary_sock;
-static char buffer[MESSAGE_SIZE+1];
+static struct fsm_server_sock_list pre_cs_primary_socks;
+static struct fsm_server_sock_list pre_cr_primary_socks;
+//static int primary_sock;
+static int sr_primary_sock;
+static int cs_primary_sock;
+static int cr_primary_sock;
+//static char buffer[REQ_CH_MES_SIZE+1];
+static int max_sd;
 
 // pipe
 static int pipe_fds[2];
@@ -52,7 +63,7 @@ static void handle_signals();
 static void accept_connections();
 static void respond_accepted();
 static void handle_primary();
-static void non_fatal_error();
+static void serv_log(char *mes, int data);
 static void fatal_error();
 static void add_accepted_socks();
 
@@ -70,11 +81,19 @@ int main(int argc, char *argv[])
 		case SIGNAL_INIT_ERR:		fatal_error();
 		default:			fatal_error();
 	}
+	accepted_socks.ttl = 10;
+	pre_primary_socks.ttl = 3;
+	pre_cs_primary_socks.ttl = 3;
+	pre_cr_primary_socks.ttl = 3;
 
 	// init listener
 	init_listener();
 	// init pipe for signals to prevent select race
 	init_pipe();
+	// init timer
+	if (OK != start_timer(500)) {
+		fatal_error();
+	}
 
 //main_loop:
 	for (;;) 
@@ -90,7 +109,7 @@ int main(int argc, char *argv[])
 		handle_primary();
 	}
 }
-static void init_env(int argc, char *argv[])
+void init_env(int argc, char *argv[])
 {
 	int scan_res;
 	if (1 < argc) {
@@ -109,43 +128,13 @@ static void init_env(int argc, char *argv[])
 	fprintf(stderr, "[USAGE]: %s <port>\n", argv[0]);
 	fprintf(stderr, "[LOG]: Starting without specified port number...\n");
 	port_num = 0;
+	
 }
 void init_listener() 
 {
-	/*int opt = 1;
-	// create socket
-	if (0 == (server_socket = socket(AF_INET, SOCK_STREAM, 0))) {
-		perror("socket failed");
-		longjmp(goto_error, INIT_LISTENER_ERR);
-	}
-	// explicitly set to reuse address to avoid timeout
-	if (0 > setsockopt(server_socket, SOL_SOCKET, SO_REUSEADDR, (char *) &opt, sizeof opt)) {
-		perror("setsockopt failed");
-		longjmp(goto_error, INIT_LISTENER_ERR);
-	}
-	// fill in address
-	address.sin_family = AF_INET;
-	address.sin_addr.s_addr = INADDR_ANY;
-	address.sin_port = htons(port_num); 
-	// bind socket
-	if (0 > bind(server_socket, (struct sockaddr *) &address, sizeof address)) {
-		perror("setsockopt failed");
-		longjmp(goto_error, INIT_LISTENER_ERR);
-	}
-	addr_len = sizeof(address);
-	// get port socket was bind to
-	if (0 > getsockname(server_socket, (struct sockaddr * restrict) &address, &addr_len)) {
-		perror("getsockopt failed");
-		longjmp(goto_error, INIT_LISTENER_ERR);
-	}
-	// listen connections, up to 512 in queue (max number depends on OS and could be smaller)
-	if (0 > listen(server_socket, 512)) {
-		perror("listen");
-		longjmp(goto_error, INIT_LISTENER_ERR);
-	}*/
 	if (-1 == (server_socket = get_passive_socket(&port_num))) {
 		// unable to create listener
-		printf("[LOG]: server failed to create listener...");
+		fprintf(stderr, "[LOG]: server failed to create listener...");
 		exit(EXIT_FAILURE);
 	}
 	else {
@@ -182,10 +171,9 @@ void init_pipe()
 	}
 	// init signals
 	sigemptyset(&sig_act.sa_mask);
-	//sigemptyset(&sig_act.sa_mask);
 	sig_act.sa_flags = SA_RESTART;
 	sig_act.sa_handler = signal_handler; 	// signal handler
-	if (-1 == sigaction(SIGINT, &sig_act, NULL)) {
+	if (-1 == sigaction(SIGUSR1, &sig_act, NULL)) {
 		perror("sigaction failed");
 		longjmp(goto_error, SIGNAL_INIT_ERR);
 	}
@@ -194,185 +182,335 @@ void init_pipe()
 void signal_handler()
 {
 	int saved_errno;
+	int mes = 0;
 	
 	saved_errno = errno;
-	if (-1 == write(pipe_fds[1], "x", 1) && errno != EAGAIN) {
-		perror("signal_handler pipe write");
+	
+	if (-1 == (mes = write(pipe_fds[1], "x", 1))) {
+		if (EAGAIN == errno) {
+			serv_log("signal_handler EAGAIN", mes);
+		}
+		else {
+			perror("signal_handler pipe write");
+		}
 	}
+	serv_log("signal handler", mes);
 	errno = saved_errno;
 }
 void wait_all() 
 {
-	int max_sd;
+	serv_log("wait_all ....", 0);
 	int act;
+	max_sd = 0;
 	// clean & set up sets
 	FD_ZERO(&main_set);
+	FD_ZERO(&write_set);
 	FD_SET(server_socket, &main_set);
 	max_sd = server_socket;
 	// set pipe read-end to catch signals
 	FD_SET(pipe_fds[0], &main_set);
-	max_sd = (server_socket > pipe_fds[0]) ? server_socket : pipe_fds[0];
+	//max_sd = (max_sd > pipe_fds[0]) ? max_sd : pipe_fds[0];
+	max_sd = (max_sd < pipe_fds[0]) ? pipe_fds[0] : max_sd;
 	// add accepted sockets if any
 	add_accepted_socks();
 		
 	// add primary sockets if exist
-	if (primary_sock) {
-		FD_SET(primary_sock, &main_set);
+	if (sr_primary_sock) {
+		FD_SET(sr_primary_sock, &write_set);
+		max_sd = (max_sd > sr_primary_sock) ? max_sd : sr_primary_sock;
 	}
-	act = select(max_sd + 1, &main_set, NULL, NULL, NULL);
+	if (cs_primary_sock) {
+		FD_SET(cs_primary_sock, &main_set);
+		max_sd = (max_sd > cs_primary_sock) ? max_sd : cs_primary_sock;
+	}
+	if (cr_primary_sock) {
+		FD_SET(cr_primary_sock, &write_set);
+		max_sd = (max_sd > cr_primary_sock) ? max_sd : cr_primary_sock;
+	}
+	act = select(max_sd + 1, &main_set, &write_set, NULL, NULL);
 	if ((0 > act) && (errno != EINTR)) {
 		perror("select failure");
 	}
-	
+	serv_log("wait_all ....end", 0);
 }
 void handle_signals()
 {
+	serv_log("handle_signals ....", 0);
 	char ch = 0;
+	int updated = 0;
 	if (FD_ISSET(pipe_fds[0], &main_set)) {
-		printf("[LOG]: fsm_server: signal was caught\n");
+		serv_log("handle_signals: signals caught", 0);
 		for (;;) {
-			if (-1 == read(pipe_fds[0], &ch, 1)) {
-				if (EAGAIN == errno) {
-					return;		// nothing to do yet
-					// break; 	// implement in case of real signals workflow
-				}
-				else {
-					perror("handle_signals pipe read error");
-				}
+		serv_log("handle_signals: in for loop ", 0);
+		if (-1 == read(pipe_fds[0], &ch, 1)) {
+			if (EAGAIN == errno) {
+				break;
 			}
+			perror("handle_signals pipe read error");
+			fatal_error();
+		}
+		if ('x' == ch && 0 == updated) {
+			serv_log("handle_signals: x caught", 0);
+			if (OK != sock_list_update_ttl(&accepted_socks)) {
+				fatal_error();
+			}
+			if (OK != sock_list_update_ttl(&pre_primary_socks)) {
+				fatal_error();
+			}
+			if (OK != sock_list_update_ttl(&pre_cs_primary_socks)) {
+				fatal_error();
+			}
+			if (OK != sock_list_update_ttl(&pre_cr_primary_socks)) {
+				fatal_error();
+			}
+			updated = 1;
+		}
 		}
 	}
+	serv_log("handle_signals ....end", 0);
 }
 void accept_connections() 
 {
+	serv_log("accept_connections ....", 0);
 	int accepted_socket = 0;
 	if (FD_ISSET(server_socket, &main_set)) 
 	{
-		if (0 > (accepted_socket = accept(server_socket, (struct sockaddr *) &address, &addr_len))) {
-			perror("accept failed");
-			non_fatal_error(ACCEPTION_FAIL);
-		}
-		else {
+		if ((accepted_socket = accept_conn_socket())) {
 			// add to accepted socket list
-			sock_list_push(&accepted_socks, accepted_socket);
+			serv_log("accept_connections new accepted_socket = ", accepted_socket);
+			if (OK != sock_list_push(&accepted_socks, accepted_socket)) {
+				fatal_error();
+			}
 		}
  	}
+	serv_log("accept_connections ....end", 0);
 }
 void respond_accepted()
 {
+	serv_log("respond_accepted ....", 0);
 	struct fsm_server_sock_node *sock = NULL;
-	int mes_len;
-	int close_sock = 1;
-	if ((sock = accepted_socks.first)) {
-		do {
-			if (FD_ISSET(sock->sd, &main_set)) {
-				// check for full message availability
-				// read all messages, put all socket who requested state to primary candidates
-				if (0 < (mes_len = read(sock->sd, &buffer, MESSAGE_SIZE))) {
-					if (mes_len == 2) {
-						// check the message to be 'state request'
-						if ('S' == buffer[0] && 'Q' == buffer[1]) {
-							close_sock = sock_node_move(&accepted_socks, &pre_primary_socks, sock->sd);
-						}
-						else {
-							// close all others
-						}
+	//int mes_len;
+	int close_sock;
+	if (!(sock = accepted_socks.first)) {
+		return; 	// no accepted sockets
+	}
+	do {
+		if (FD_ISSET(sock->sd, &main_set)) {
+			serv_log("respond_accepted: socket data is ready", sock->sd);
+			// check for partial messages
+			if (!(is_partial(sock->sd, REQ_ST_MES_SIZE))) 
+			{
+				close_sock = sock_read_state_req(sock->sd, REQ_ST_MES_SIZE);
+				if (close_sock) {
+					serv_log("respond_accepted: wrong message ", sock->sd);
+					// wrong message, close socket
+					close(sock->sd);
+					if (OK != sock_list_remove(&accepted_socks, sock->sd)) {
+						fatal_error();
 					}
-					else if (mes_len == 1) {
-						// TODO partial message... need to handler it somehow
-						// i can use recv instead of read with 'wait' flag
-						// or ...
-						printf("[LOG]: fsm_server partial message");
-					}
-					else {
-						// it is not state request, ignore, ???close that socket
-					}
-				}
-				else if (-1 == mes_len) {
-					//error case
-					perror("respond_accepted read error");
 				}
 				else {
-					// disconnect case
+					// good state req, move to pre-primary
+					if (OK != sock_node_move(&accepted_socks, &pre_primary_socks, sock->sd)) {
+						fatal_error();
+					}
 				}
 			}
-			sock = sock->next;
-			// close socket if not marked previously
-			if (close_sock) {
-				close(sock->prev->sd);
-				sock_list_remove(&accepted_socks, sock->prev->sd);
+		}
+		sock = sock->next;
+	} while (sock);
+	serv_log("respond_accepted ....end", 0);
+}
+void handle_sr_primary()
+{
+	enum fsm_state_name conv;	// for enum conversion???
+	char buffer[4] = {'S', 'R'};
+	if (sr_primary_sock) 
+	{
+		if (FD_ISSET(sr_primary_sock, &write_set)) 
+		{
+			serv_log("handle_sr_primary(): data ready to be written", sr_primary_sock);
+			// create state response ??? possible move to proc
+			if (OK != fsm_current_state_name(&conv)) {
+				fatal_error();
 			}
-		} while (sock);
+			buffer[2] = (char) conv;
+			if (OK != sock_send_response(sr_primary_sock, buffer, REQ_CH_MES_SIZE)) 
+			{
+				// error sending response
+				serv_log("handle_sr_primary(): sock_send_response error", sr_primary_sock);
+				close(sr_primary_sock);
+				sr_primary_sock = 0;
+				goto set_sr_primary;	// choose another one socket to communicate with
+			}
+			if (OK != sock_list_push(&pre_cs_primary_socks, sr_primary_sock)) {
+				fatal_error();
+			}
+			sr_primary_sock = 0;
+			goto set_sr_primary;
+		}
+	} 
+	else 
+	{
+set_sr_primary:
+		if (!(pre_primary_socks.first)) {
+			return;
+		}
+		sr_primary_sock = pre_primary_socks.first->sd;
+		if (OK != sock_list_remove(&pre_primary_socks, sr_primary_sock)) {
+			fatal_error();
+		}
 	}
 }
-void handle_primary() {
+void handle_cs_primary()
+{
+	char req_state;
+	//char buffer[4];
+	if (cs_primary_sock)
+	{
+		if (FD_ISSET(cs_primary_sock, &main_set))
+		{
+			// read change state message
+			serv_log("handle_cs_primary(): ready to read change state req", cs_primary_sock);
+			if (is_partial(cs_primary_sock, REQ_CH_MES_SIZE)) {
+				serv_log("handle_cs_primary(): partial  read", cs_primary_sock);
+				return;
+			}
+			if (OK != sock_read_state_change(cs_primary_sock, &req_state)) {
+				serv_log("handle_cs_primary(): error  read", cs_primary_sock);
+				// error reading state
+				close(cs_primary_sock);
+				cs_primary_sock = 0;
+				goto set_cs_primary;
+			}
+			// state change
+			if (OK != fsm_switch_state(req_state)) {
+				// wrong state was requested
+				serv_log("handle_cs_primary(): wrong state", cs_primary_sock);
+				close(cs_primary_sock);
+				cs_primary_sock = 0;
+				goto set_cs_primary;
+			}
+			if (OK != sock_list_push(&pre_cr_primary_socks, cs_primary_sock)) {
+				fatal_error();
+			}
+			cs_primary_sock = 0;
+			goto set_cs_primary;
+		}
+	}
+	else 
+	{
+set_cs_primary:
+		if (!(pre_cs_primary_socks.first)) {
+			return;
+		}
+		cs_primary_sock = pre_cs_primary_socks.first->sd;
+		if (OK != sock_list_remove(&pre_cs_primary_socks, cs_primary_sock)) {
+			fatal_error();
+		}
+	}
+}
+void handle_cr_primary()
+{
 	enum fsm_state_name conv;	// for enum conversion???
-	int msg_len;
+	char buffer[4] = {'C', 'R'};
+	if (cr_primary_sock) 
+	{
+		if (FD_ISSET(cr_primary_sock, &write_set)) 
+		{
+			serv_log("handle_cr_primary(): ready to write change state resp", cr_primary_sock);
+			// create state response ??? possible move to proc
+			if (OK != fsm_current_state_name(&conv)) {
+				fatal_error();
+			}
+			buffer[2] = (char) conv;
+			if (OK != sock_send_response(cr_primary_sock, buffer, REQ_CH_MES_SIZE)) 
+			{
+				// error sending response
+				serv_log("handle_cr_primary(): sock_send_response error", cr_primary_sock);
+				close(cr_primary_sock);
+				cr_primary_sock = 0;
+				goto set_cr_primary;	// choose another one socket to communicate with
+			}
+			if (OK != sock_list_push(&accepted_socks, cr_primary_sock)) {
+				fatal_error();
+			}
+			cr_primary_sock = 0;
+			goto set_cr_primary;
+		}
+	} 
+	else 
+	{
+set_cr_primary:
+		if (!(pre_cr_primary_socks.first)) {
+			return;
+		}
+		cr_primary_sock = pre_cr_primary_socks.first->sd;
+		if (OK != sock_list_remove(&pre_cr_primary_socks, cr_primary_sock)) {
+			fatal_error();
+		}
+	}
+}
+void handle_primary()
+{
+	serv_log("handle_primary ....", 0);
+	handle_sr_primary();
+	handle_cs_primary();
+	handle_cr_primary();
+	serv_log("handle_primary ....end", 0);
+}
+/*void handle_primary() {
+	enum fsm_state_name conv;	// for enum conversion???
 	enum fsm_state_name resp;
 	if (primary_sock) {
+	serv_log("handle_primary, primary sock is ", primary_sock);
 		if (FD_ISSET(primary_sock, &main_set)) {
-			// read change state message
-			if (0 > (msg_len = read(primary_sock, &buffer, MESSAGE_SIZE))) {
-				perror("handle_primary primay_sock read error");
-			}
-			if (3 == msg_len) {
-				if ('C' == buffer[0] && 'S' == buffer[1]) {
-					// state request change
-					fsm_switch_state(buffer[2]);
-					fsm_current_state_name(&resp);
-					buffer[0] = 'C';
-					buffer[1] = 'R';
-					buffer[2] = (char) resp;
-					if (0 > (msg_len = write(primary_sock, &buffer, MESSAGE_SIZE))) {
-						perror("handle_primary after state change write error");
-					}
-					else if (3 == msg_len) {
-						// success write
-						sock_list_push(&accepted_socks, primary_sock);
-						primary_sock = 0;
-					}
-					else {
-						// partially written? signal interrupted??
-					}
-				}
-			}
-			else if (3 > msg_len) {
-				// partial message
-				printf("[LOG]: fsm_server partial message");
-			}
-			else {
-				// wrong message, close connection
+			fsm_current_state_name(&resp);
+			buffer[0] = 'C';
+			buffer[1] = 'R';
+			buffer[2] = (char) resp;
+			// write response with current fsm state
+			if (sock_send_response(primary_sock, buffer, REQ_CH_MES_SIZE)) {
+				// error sending response
+				close(primary_sock);
+				primary_sock = 0;
+				goto set_primary;	// choose another one socket to communicate with
 			}
 		}
 
 	}
 	else {
+		// set primary sock
+set_primary:
 		// check for available pre_primary socks
 		if (!(pre_primary_socks.first)) {
 			return;
 		}
+		serv_log("handle_primary(): before set_primary", pre_primary_socks.first->sd);
 		// make some sock primary
 		primary_sock = pre_primary_socks.first->sd;
-		sock_list_remove(&pre_primary_socks, primary_sock);
-		
+		if (OK != sock_list_remove(&pre_primary_socks, primary_sock)) {
+			fatal_error();
+		}
+		// create state response ??? possible move to proc
 		buffer[0] = 'S';
 		buffer[1] = 'R';
-		//fsm_current_state_name((void *)(((char *)&buffer)+2));
-		fsm_current_state_name(&conv);
+		if (OK != fsm_current_state_name(&conv)) {
+			fatal_error();
+		}
 		buffer[2] = (char) conv;
-		if (0 > write(primary_sock, &buffer, MESSAGE_SIZE)) {
-			if (EAGAIN == errno) {
-				return; 	// may be re-try
-			}
-			else {
-			 	perror("handle_primary write error");
-			}
+		if (OK != sock_send_response(primary_sock, buffer, REQ_CH_MES_SIZE)) {
+			// error sending response
+			serv_log("handle_primary(): sock_send_response error", primary_sock);
+			close(primary_sock);
+			primary_sock = 0;
+			goto set_primary;	// choose another one socket to communicate with
 		}
 	}
-}
-void non_fatal_error(enum fsm_server_error_name error_name)
+}*/
+void serv_log(char *mes, int data)
 {
-	fprintf(stderr, "[LOG]: fsm_server: non_fatal_error = %d\n", error_name);
+	fprintf(stderr, "[LOG]: fsm_server: %s, %d\n", mes, data);
 }
 void fatal_error()
 {
@@ -385,6 +523,7 @@ void add_accepted_socks()
 	if ((sock = accepted_socks.first)) {
 		do {
 			FD_SET(sock->sd, &main_set);
+			max_sd = (max_sd > sock->sd) ? max_sd : sock->sd;
 			sock = sock->next;
 		} while (sock);
 	}

@@ -1,24 +1,30 @@
-		fsm_server design doc
-	fsm_server purpose:
+		server design doc
+	server purpose:
 * to help fsm provide its state to connected clients and to receive state-change requests
 	functional requirements:
 * serve as many connections as many system resources available
-* serve connections on a fair base, dont stuck on one
-* 
+* serve connections on a fair base, dont stuck at one
+* one single-threaded process
+	usage:
+FSMserver <port>
 
 	data model
-connection
+server_socket
+client_socket
 	state:
 		accepted 	// connection accepted, new fd created
 		in_queue	// connection get_state_request received
 		primary		// connection state_response sent, waiting for switch_state request 
+error
+signal
+	pipe
 
 	workflow
 init_environment
 init_listener
 main loop:
-	accept_connections
 	wait_all
+	accept_connections
 	wait_primary
 
 	service:

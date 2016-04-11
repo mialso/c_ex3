@@ -26,6 +26,7 @@ int sock_list_push(struct fsm_server_sock_list *list, int sd)
 		
 		if (node) {
 			// main logic
+			node->ttl = list->ttl;
 			node->sd = sd;
 			if (NULL == list->last) {
 				list->last = node;
@@ -97,6 +98,14 @@ int sock_list_pop(struct fsm_server_sock_list *list, int *sd)
 	else {
 		return 5; 	// empty list
 	}
+}
+int sock_list_update_ttl(struct fsm_server_sock_list *list)
+{
+	struct fsm_server_sock_node *node;
+	for (node = list->first; node != NULL; node = node->next) {
+		--(node->ttl);
+	}
+	return 0;
 }
 int remove_node(struct fsm_server_sock_list *list, struct fsm_server_sock_node *node)
 {
