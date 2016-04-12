@@ -17,25 +17,21 @@ extern int pipe_read_fd;
 // static resources
 static int port_num;
 static int server_socket;
-//static struct sockaddr_in address;
-//static socklen_t addr_len;
+
 static fd_set main_set;
 static fd_set write_set;
-//static fd_set primary_set;
-//static int accepted_sock_num;
+
 static struct fsm_server_sock_list accepted_socks;
 static struct fsm_server_sock_list pre_primary_socks;
 static struct fsm_server_sock_list pre_cs_primary_socks;
 static struct fsm_server_sock_list pre_cr_primary_socks;
-//static int primary_sock;
 static int sr_primary_sock;
 static int cs_primary_sock;
 static int cr_primary_sock;
-//static char buffer[REQ_CH_MES_SIZE+1];
 static int max_sd;
 
 // error stuff
-static enum fsm_server_error_name server_error;
+//static enum fsm_server_error_name server_error;
 
 // service declaration
 static void init_env(int argc, char *argv[]);
@@ -45,9 +41,12 @@ static void handle_signals();
 static void accept_connections();
 static void respond_accepted();
 static void handle_primary();
+static void handle_sr_primary();
+static void handle_cs_primary();
+static void handle_cr_primary();
 static void handle_fsm_logs();
 static void serv_log(char *mes, int data);
-static void fatal_error();
+static void fatal_error(enum server_error_name err_name);
 static void add_accepted_socks();
 
 int main(int argc, char *argv[])
@@ -64,7 +63,7 @@ int main(int argc, char *argv[])
 	init_listener();
 	// init signal pipe 
 	if (OK != init_signal_pipe()) {
-		fatal_error();
+		fatal_error(SIGNAL_FAIL);
 	}
 
 //main_loop:
@@ -106,9 +105,7 @@ void init_env(int argc, char *argv[])
 void init_listener() 
 {
 	if (-1 == (server_socket = get_passive_socket(&port_num))) {
-		// unable to create listener
-		fprintf(stderr, "[LOG]: server failed to create listener...");
-		exit(EXIT_FAILURE);
+		fatal_error(SOCKET_FAIL);
 	}
 	else {
 		// info user about successful initialization
@@ -164,26 +161,27 @@ void handle_signals()
 	int updated = 0;
 	if (FD_ISSET(pipe_read_fd, &main_set)) {
 		for (;;) {
+		// TODO possibly refactor to get number of events and update ttl according to that
 		if (-1 == read(pipe_read_fd, &ch, 1)) {
 			if (EAGAIN == errno) {
 				break;
 			}
 			perror("handle_signals pipe read error");
-			fatal_error();
+			fatal_error(SIGNAL_FAIL);
 		}
 		if (timer_signal == ch && 0 == updated) {
 			serv_log("handle_signals: x caught", 0);
 			if (OK != sock_list_update_ttl(&accepted_socks)) {
-				fatal_error();
+				fatal_error(SOCKET_LIST_FAIL);
 			}
 			if (OK != sock_list_update_ttl(&pre_primary_socks)) {
-				fatal_error();
+				fatal_error(SOCKET_LIST_FAIL);
 			}
 			if (OK != sock_list_update_ttl(&pre_cs_primary_socks)) {
-				fatal_error();
+				fatal_error(SOCKET_LIST_FAIL);
 			}
 			if (OK != sock_list_update_ttl(&pre_cr_primary_socks)) {
-				fatal_error();
+				fatal_error(SOCKET_LIST_FAIL);
 			}
 			updated = 1;
 		}
@@ -201,7 +199,7 @@ void accept_connections()
 			// add to accepted socket list
 			serv_log("accept_connections new accepted_socket = ", accepted_socket);
 			if (OK != sock_list_push(&accepted_socks, accepted_socket)) {
-				fatal_error();
+				fatal_error(SOCKET_LIST_FAIL);
 			}
 		}
  	}
@@ -228,13 +226,13 @@ void respond_accepted()
 					// wrong message, close socket
 					close(sock->sd);
 					if (OK != sock_list_remove(&accepted_socks, sock->sd)) {
-						fatal_error();
+						fatal_error(SOCKET_LIST_FAIL);
 					}
 				}
 				else {
 					// good state req, move to pre-primary
 					if (OK != sock_node_move(&accepted_socks, &pre_primary_socks, sock->sd)) {
-						fatal_error();
+						fatal_error(SOCKET_LIST_FAIL);
 					}
 				}
 			}
@@ -254,7 +252,7 @@ void handle_sr_primary()
 			serv_log("handle_sr_primary(): data ready to be written", sr_primary_sock);
 			// create state response ??? possible move to proc
 			if (OK != fsm_current_state_name(&conv)) {
-				fatal_error();
+				fatal_error(FSM_FAIL);
 			}
 			buffer[2] = (char) conv;
 			if (OK != sock_send_response(sr_primary_sock, buffer, REQ_CH_MES_SIZE)) 
@@ -266,7 +264,7 @@ void handle_sr_primary()
 				goto set_sr_primary;	// choose another one socket to communicate with
 			}
 			if (OK != sock_list_push(&pre_cs_primary_socks, sr_primary_sock)) {
-				fatal_error();
+				fatal_error(SOCKET_LIST_FAIL);
 			}
 			sr_primary_sock = 0;
 			goto set_sr_primary;
@@ -280,7 +278,7 @@ set_sr_primary:
 		}
 		sr_primary_sock = pre_primary_socks.first->sd;
 		if (OK != sock_list_remove(&pre_primary_socks, sr_primary_sock)) {
-			fatal_error();
+			fatal_error(SOCKET_LIST_FAIL);
 		}
 	}
 }
@@ -314,7 +312,7 @@ void handle_cs_primary()
 				goto set_cs_primary;
 			}
 			if (OK != sock_list_push(&pre_cr_primary_socks, cs_primary_sock)) {
-				fatal_error();
+				fatal_error(SOCKET_LIST_FAIL);
 			}
 			cs_primary_sock = 0;
 			goto set_cs_primary;
@@ -328,7 +326,7 @@ set_cs_primary:
 		}
 		cs_primary_sock = pre_cs_primary_socks.first->sd;
 		if (OK != sock_list_remove(&pre_cs_primary_socks, cs_primary_sock)) {
-			fatal_error();
+			fatal_error(SOCKET_LIST_FAIL);
 		}
 	}
 }
@@ -343,7 +341,7 @@ void handle_cr_primary()
 			serv_log("handle_cr_primary(): ready to write change state resp", cr_primary_sock);
 			// create state response ??? possible move to proc
 			if (OK != fsm_current_state_name(&conv)) {
-				fatal_error();
+				fatal_error(FSM_FAIL);
 			}
 			buffer[2] = (char) conv;
 			if (OK != sock_send_response(cr_primary_sock, buffer, REQ_CH_MES_SIZE)) 
@@ -355,7 +353,7 @@ void handle_cr_primary()
 				goto set_cr_primary;	// choose another one socket to communicate with
 			}
 			if (OK != sock_list_push(&accepted_socks, cr_primary_sock)) {
-				fatal_error();
+				fatal_error(SOCKET_LIST_FAIL);
 			}
 			cr_primary_sock = 0;
 			goto set_cr_primary;
@@ -369,7 +367,7 @@ set_cr_primary:
 		}
 		cr_primary_sock = pre_cr_primary_socks.first->sd;
 		if (OK != sock_list_remove(&pre_cr_primary_socks, cr_primary_sock)) {
-			fatal_error();
+			fatal_error(SOCKET_LIST_FAIL);
 		}
 	}
 }
@@ -388,7 +386,7 @@ void handle_fsm_logs()
 	}
 	if (FD_ISSET(fsm_log_file, &write_set)) {
 		if (OK != fsm_flush_logs()) {
-			fatal_error();
+			fatal_error(FSM_FAIL);
 		}
 	}
 }
@@ -445,9 +443,9 @@ void serv_log(char *mes, int data)
 {
 	fprintf(stderr, "[LOG]: fsm_server: %s, %d\n", mes, data);
 }
-void fatal_error()
+void fatal_error(enum server_error_name err_name)
 {
-	fprintf(stderr, "[LOG]: fsm_server: fatal_error = %d\n", server_error);
+	fprintf(stderr, "[LOG]: fsm_server: fatal_error = %d\n", err_name);
 	exit(EXIT_FAILURE);
 }
 void add_accepted_socks()

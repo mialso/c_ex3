@@ -1,7 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
-//#include <stddef.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 
@@ -14,7 +13,6 @@ static int sock;
 static char host[128];
 static char port[8];
 static char mes_buf[4];
-//static char fsm_state;
 
 // service
 static void init_env(int argc, char *argv[]);
@@ -39,8 +37,8 @@ void init_env(int argc, char *argv[])
 	int port_num;
 	//char buf[128];
 	int scan_res;
-	if (2 < argc) {
-		//if (1 != (scan_res = sscanf(argv[1], "%s", buf))) {
+	if (2 < argc) 
+	{
 		if (1 != (scan_res = sscanf(argv[1], "%s", host))) {
 			printf("[ERROR]: host is not readable\n");
 			goto usage;
@@ -62,7 +60,6 @@ void connect_server(char *host, char *port)
 	if (!(sock = get_active_socket(host, port))) {
 		printf("[ERROR]: error establishing connection to %s:%s\n", host, port);
 	}
-	//printf("[INFO]: client success connect, socket = %d\n", socket);
 }
 void request_state()
 {
