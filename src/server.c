@@ -1,31 +1,21 @@
 #include <stdio.h>
 #include <unistd.h>		// close
 #include <stdlib.h>
-#include <setjmp.h>
-#include <fcntl.h>
 #include <errno.h>
 
 #include <sys/time.h>		// FD_SET, FD_ZERO, FD_ISSET macros
-#include <netinet/in.h>
-#include <sys/socket.h>
-#include <sys/types.h>
-//#include <arpa/inet.h>
-#include <time.h>
-
-#include <signal.h>
 
 #include "server_error.h"
 #include "server_socket.h"
 #include "server_timer.h"
+#include "server_signal.h"
 #include "server_socket_list.h"
 #include "fsm.h"
-//#include "fsm_error.h"
 
-#define REQ_ST_MES_SIZE 2
-#define REQ_CH_MES_SIZE 3
 
 // wide available log file descriptor
 extern int fsm_log_file;
+extern int pipe_fds[2];
 // static resources
 static int port_num;
 static int server_socket;
@@ -46,20 +36,12 @@ static int cr_primary_sock;
 //static char buffer[REQ_CH_MES_SIZE+1];
 static int max_sd;
 
-// pipe
-static int pipe_fds[2];
-// signals
-static struct sigaction sig_act;
-
-// error handler stuff
-static jmp_buf goto_error;
+// error stuff
 static enum fsm_server_error_name server_error;
 
 // service declaration
 static void init_env(int argc, char *argv[]);
 static void init_listener();
-static void init_pipe();
-static void signal_handler();
 static void wait_all();
 static void handle_signals();
 static void accept_connections();
@@ -75,15 +57,6 @@ int main(int argc, char *argv[])
 	// init arguments -> create environment
 	init_env(argc, argv);
 
-	// handle errors
-	server_error = setjmp(goto_error);
-	switch (server_error) {
-		case OK:			break;
-		case INIT_LISTENER_ERR:		fatal_error();
-		case PIPE_INIT_ERR:		fatal_error();
-		case SIGNAL_INIT_ERR:		fatal_error();
-		default:			fatal_error();
-	}
 	accepted_socks.ttl = 10;
 	pre_primary_socks.ttl = 3;
 	pre_cs_primary_socks.ttl = 3;
@@ -92,7 +65,9 @@ int main(int argc, char *argv[])
 	// init listener
 	init_listener();
 	// init pipe for signals to prevent select race
-	init_pipe();
+	if (OK != init_signal_pipe()) {
+		fatal_error();
+	}
 	// init timer
 	if (OK != start_timer(500)) {
 		fatal_error();
@@ -146,61 +121,6 @@ void init_listener()
 		printf("[INFO]: server listening at port %d\n", port_num);
 	}
 }
-void init_pipe()
-{
-	int flags;
-	if (-1 == pipe(pipe_fds)) {
-		perror("pipe failed");
-		longjmp(goto_error, PIPE_INIT_ERR);
-	}
-	// make read end non-blocking
-	if (-1 == (flags = fcntl(pipe_fds[0], F_GETFL))) {
-		perror("fcntl F_GETFL failed");
-		longjmp(goto_error, PIPE_INIT_ERR);
-	}
-	flags |= O_NONBLOCK;
-	if (-1 == fcntl(pipe_fds[0], F_SETFL, flags)) {
-		perror("fcntl F_SETFL failed");
-		longjmp(goto_error, PIPE_INIT_ERR);
-	}
-	// make write end non-blocking
-	if (-1 == (flags = fcntl(pipe_fds[1], F_GETFL))) {
-		perror("fcntl F_GETFL failed");
-		longjmp(goto_error, PIPE_INIT_ERR);
-	}
-	flags |= O_NONBLOCK;
-	if (-1 == fcntl(pipe_fds[1], F_SETFL, flags)) {
-		perror("fcntl F_SETFL failed");
-		longjmp(goto_error, PIPE_INIT_ERR);
-	}
-	// init signals
-	sigemptyset(&sig_act.sa_mask);
-	sig_act.sa_flags = SA_RESTART;
-	sig_act.sa_handler = signal_handler; 	// signal handler
-	if (-1 == sigaction(SIGUSR1, &sig_act, NULL)) {
-		perror("sigaction failed");
-		longjmp(goto_error, SIGNAL_INIT_ERR);
-	}
-
-}
-void signal_handler()
-{
-	int saved_errno;
-	int mes = 0;
-	
-	saved_errno = errno;
-	
-	if (-1 == (mes = write(pipe_fds[1], "x", 1))) {
-		if (EAGAIN == errno) {
-			serv_log("signal_handler EAGAIN", mes);
-		}
-		else {
-			perror("signal_handler pipe write");
-		}
-	}
-	serv_log("signal handler", mes);
-	errno = saved_errno;
-}
 void wait_all() 
 {
 	serv_log("wait_all ....", 0);
@@ -212,9 +132,11 @@ void wait_all()
 	FD_SET(server_socket, &main_set);
 	max_sd = server_socket;
 	// set pipe read-end to catch signals
-	FD_SET(pipe_fds[0], &main_set);
-	//max_sd = (max_sd > pipe_fds[0]) ? max_sd : pipe_fds[0];
-	max_sd = (max_sd < pipe_fds[0]) ? pipe_fds[0] : max_sd;
+	if (pipe_fds[0]) {
+		serv_log("pipe read end set", pipe_fds[0]);
+		FD_SET(pipe_fds[0], &main_set);
+		max_sd = (max_sd < pipe_fds[0]) ? pipe_fds[0] : max_sd;
+	}
 	// add accepted sockets if any
 	add_accepted_socks();
 		
@@ -247,9 +169,7 @@ void handle_signals()
 	char ch = 0;
 	int updated = 0;
 	if (FD_ISSET(pipe_fds[0], &main_set)) {
-		serv_log("handle_signals: signals caught", 0);
 		for (;;) {
-		serv_log("handle_signals: in for loop ", 0);
 		if (-1 == read(pipe_fds[0], &ch, 1)) {
 			if (EAGAIN == errno) {
 				break;
@@ -257,7 +177,7 @@ void handle_signals()
 			perror("handle_signals pipe read error");
 			fatal_error();
 		}
-		if ('x' == ch && 0 == updated) {
+		if (timer_signal == ch && 0 == updated) {
 			serv_log("handle_signals: x caught", 0);
 			if (OK != sock_list_update_ttl(&accepted_socks)) {
 				fatal_error();
@@ -529,7 +449,7 @@ set_primary:
 }*/
 void serv_log(char *mes, int data)
 {
-	//fprintf(stderr, "[LOG]: fsm_server: %s, %d\n", mes, data);
+	fprintf(stderr, "[LOG]: fsm_server: %s, %d\n", mes, data);
 }
 void fatal_error()
 {

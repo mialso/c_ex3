@@ -3,6 +3,9 @@
 
 #include <stddef.h>
 
+#define REQ_ST_MES_SIZE 2
+#define REQ_CH_MES_SIZE 3
+
 // declarations
 enum fsm_state_name {
 	EMPTY, 		// 0 by default
