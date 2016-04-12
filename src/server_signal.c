@@ -9,14 +9,16 @@
 
 #include "server_signal.h"
 #include "server_signal_error.h"
+#include "server_signal_timer.h"
 
 #define MODULE_NAME "<server_signal>"
 
 // global pipe fds
-int pipe_fds[2];
+int pipe_read_fd;
 
 // static resources
 static struct sigaction sig_act;
+static int pipe_fds[2];
 
 // error stuff
 static jmp_buf goto_error;
@@ -40,7 +42,11 @@ int init_signal_pipe()
 	// main flow
 	init_pipe();
 	init_signals();
+	if (OK != start_timer(200)) {
+		return TIMER_FAIL;
+	}
 	
+	pipe_read_fd = pipe_fds[0];
 	return OK;
 }
 

@@ -7,15 +7,13 @@
 
 #include "server_error.h"
 #include "server_socket.h"
-#include "server_timer.h"
 #include "server_signal.h"
 #include "server_socket_list.h"
 #include "fsm.h"
 
-
-// wide available log file descriptor
+// global descriptors to handle by select
 extern int fsm_log_file;
-extern int pipe_fds[2];
+extern int pipe_read_fd;
 // static resources
 static int port_num;
 static int server_socket;
@@ -62,14 +60,10 @@ int main(int argc, char *argv[])
 	pre_cs_primary_socks.ttl = 3;
 	pre_cr_primary_socks.ttl = 3;
 
-	// init listener
+	// init passive socket - listener
 	init_listener();
-	// init pipe for signals to prevent select race
+	// init signal pipe 
 	if (OK != init_signal_pipe()) {
-		fatal_error();
-	}
-	// init timer
-	if (OK != start_timer(500)) {
 		fatal_error();
 	}
 
@@ -132,10 +126,10 @@ void wait_all()
 	FD_SET(server_socket, &main_set);
 	max_sd = server_socket;
 	// set pipe read-end to catch signals
-	if (pipe_fds[0]) {
-		serv_log("pipe read end set", pipe_fds[0]);
-		FD_SET(pipe_fds[0], &main_set);
-		max_sd = (max_sd < pipe_fds[0]) ? pipe_fds[0] : max_sd;
+	if (pipe_read_fd) {
+		serv_log("pipe read end set", pipe_read_fd);
+		FD_SET(pipe_read_fd, &main_set);
+		max_sd = (max_sd < pipe_read_fd) ? pipe_read_fd : max_sd;
 	}
 	// add accepted sockets if any
 	add_accepted_socks();
@@ -168,9 +162,9 @@ void handle_signals()
 	serv_log("handle_signals ....", 0);
 	char ch = 0;
 	int updated = 0;
-	if (FD_ISSET(pipe_fds[0], &main_set)) {
+	if (FD_ISSET(pipe_read_fd, &main_set)) {
 		for (;;) {
-		if (-1 == read(pipe_fds[0], &ch, 1)) {
+		if (-1 == read(pipe_read_fd, &ch, 1)) {
 			if (EAGAIN == errno) {
 				break;
 			}

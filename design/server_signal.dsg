@@ -1,0 +1,27 @@
+		server_signal design document
+	[the purpose]:
+* to handle signals
+	
+	[implementation details]:
+* restart interrupted procedure
+* provide pipe read-end to handle signal data by server
+* hardcoded timer signal handler, provided by server_signal_timer module
+
+	[data model]:
+pipe
+	read-end 	// global, to be handled by select
+	write-end
+signal
+signal-handler
+timer
+
+error
+	name
+	
+	[interface]:
+init_signal_pipe
+
+	[work-flow]:
+init_pipe
+init_signals
+init_timer

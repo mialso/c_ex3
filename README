@@ -9,8 +9,8 @@
 		-- server
 		---- server_socket
 		---- server_socket_list
-		---- server_timer
 		---- server_signal
+		------ server_signal_timer
 	client modules:
 		-- client
 		---- client_socket

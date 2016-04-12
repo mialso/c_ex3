@@ -4,7 +4,8 @@
 enum server_signal_error_name {
 	OK,
 	PIPE_INIT_ERR,
-	SIGNAL_INIT_ERR
+	SIGNAL_INIT_ERR,
+	TIMER_FAIL
 };
 
 #endif
