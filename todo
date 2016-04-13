@@ -9,10 +9,6 @@
 	** implement tests for static procedures
 
 	<server-module>
-* refactor signals and pipe to module
-* refactor <*>_primary sockets to work with *nodes instead of int's, logic
-* implement ttl, signal handler functionality
-* add fatal_error each module error-names
 
 	<client-module>
 * refactor logic and add misbehaving procs

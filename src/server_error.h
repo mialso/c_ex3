@@ -8,6 +8,7 @@ enum server_error_name {
 	PIPE_INIT_ERR,
 	SIGNAL_INIT_ERR,
 	ACCEPTION_FAIL,
+	SELECT_ERROR,
 	// module related
 	FSM_FAIL,
 	SOCKET_FAIL,

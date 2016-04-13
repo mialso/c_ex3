@@ -48,6 +48,28 @@ void test_sock_list_push()
 		test_one.error_message = "sock_list_push error";
 		test_one.error_num = res;
 	}
+	res = sock_list_remove(&list_one, sd_1);
+	if (res) {
+		test_one.result = 0;
+		test_one.error_message = "sock_list_remove error";
+		test_one.error_num = res;
+	}
+	if (NULL != list_one.first) {
+		test_one.result = 0;
+		test_one.error_message = "sock_list_remove error: first not NULL";
+		test_one.error_num = res;
+	}
+	if (NULL != list_one.last) {
+		test_one.result = 0;
+		test_one.error_message = "sock_list_remove error: last not NULL";
+		test_one.error_num = res;
+	}
+	res = sock_list_push(&list_one, sd_1);
+	if (res) {
+		test_one.result = 0;
+		test_one.error_message = "sock_list_push error";
+		test_one.error_num = res;
+	}
 	tests_print_res(test_one);
 	res = sock_list_push(&list_one, sd_1);
 	if (7 != res) {

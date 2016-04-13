@@ -8,6 +8,7 @@
 int get_active_socket(char *host_name, char *port_num)
 {
 	int sd = 0;
+	int res = 0;
 	struct addrinfo hints;
 	struct addrinfo *result, *rp;
 	
@@ -20,8 +21,9 @@ int get_active_socket(char *host_name, char *port_num)
 	hints.ai_socktype = SOCK_STREAM;
 	hints.ai_flags = AI_NUMERICSERV;
 
-	if (0 != getaddrinfo(host_name, port_num, &hints, &result)) {
-		perror("get_active_socket getaddrinfo failed");
+	if (0 != (res = getaddrinfo(host_name, port_num, &hints, &result))) {
+		//perror("get_active_socket getaddrinfo failed");
+		fprintf(stderr, "[ERROR]: <client_socket>: get_active_socket(): getaddrinfo error: %s\n", gai_strerror(res));
 		goto error;
 	}
 	// walk through res-list to find success connection
@@ -44,5 +46,8 @@ int get_active_socket(char *host_name, char *port_num)
 	return sd;
 	
 error:
+	if (sd) {
+		close(sd);
+	}
 	return 0;
 }
