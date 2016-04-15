@@ -20,8 +20,10 @@ all:
 	@echo "all invoked, no logic implemented yet, try 'server' or 'client'"
 
 server: $(server_objs)
+	@mkdir -p ./bin/
 	$(CC) -o ./bin/FSMserver $^ $(LIBS)
 client: $(client_objs)
+	@mkdir -p ./bin/
 	$(CC) -o ./bin/FSMclient $^
 
 # server
@@ -53,6 +55,7 @@ tests.o: %.o: %.c
 
 # fsm related tests
 test_fsm: $(fsm_objs)
+	@mkdir -p ./bin/tests/
 	$(CC) -o ./bin/tests/test_fsm $^
 	./bin/tests/test_fsm
 	make clean_tests
@@ -61,6 +64,7 @@ test_fsm.o: %.o: %.c
 
 # fsm_logger related tests
 test_fsm_logger: $(fsm_logger_objs)
+	@mkdir -p ./bin/tests/
 	$(CC) -o ./bin/tests/test_fsm_logger $^
 	@echo "... test with some delay ... about 5 seconds, please be patient ..."
 	./bin/tests/test_fsm_logger
@@ -72,15 +76,16 @@ test_fsm_logger.o: %.o: %.c
 
 # server_socket tests
 test_server_socket: $(server_socket_objs)
+	@mkdir -p ./bin/tests/
 	$(CC) -o ./bin/tests/test_server_socket $^
 	./bin/tests/test_server_socket
-	#./bin/tests/test_server_socket | grep RESULT
 	make clean_tests
 test_server_socket.o: %.o: %.c
 	$(CC) -c $(TEST_FLAGS) $< -o $@
 
 # client_socket tests
 test_client_socket: $(client_socket_objs)
+	@mkdir -p ./bin/tests/
 	$(CC) -o ./bin/tests/test_client_socket $^
 	./bin/tests/test_client_socket
 	make clean_tests
@@ -89,6 +94,7 @@ test_client_socket.o: %.o: %.c
 	
 # server_socket_list tests
 test_server_socket_list: $(server_socket_list_objs)
+	@mkdir -p ./bin/tests/
 	$(CC) -o ./bin/tests/test_server_socket_list $^
 	./bin/tests/test_server_socket_list
 	make clean_tests
@@ -97,10 +103,11 @@ test_server_socket_list.o: %.o: %.c
 
 .PHONY: clean_tests
 clean_tests:
-	-rm *.o
-	-rm ./bin/tests/*
+	#-rm *.o
+	find . -name "*.o" -exec rm {} \;
+	-rm -rf ./bin/tests
 .PHONY: clean
 clean:
-	-rm *.o
-	-rm ./bin/FSM*
+	find . -name "*.o" -exec rm {} \;
+	-rm -rf ./bin
 
