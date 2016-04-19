@@ -33,7 +33,6 @@ int fsm_current_state_name(enum fsm_state_name *name)
 	
 	*name = real_state.name;
 	if (*name) {
-		printf("[INFO]: fsm: fsm_current state name OK\n");
 		if (OK != fsm_log(1000, STATE_REQ, real_state.name, STATE_NO_ERROR)) {
 			fsm_error = FSM_LOGGER_ERROR;
 			return fsm_error;

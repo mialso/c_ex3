@@ -7,11 +7,14 @@
 * one single-threaded process
 	[usage]:
 FSMserver <port>
+	* if port is not in range 50000..55000 inform user and pick system provided one
+	* if port is not specified, the server starts with a system provided one and informs user
 
 	[data model]
-server_socket
-client_socket
-	state:
+connection:
+	server_socket
+	client_socket
+		state:
 		accepted 	// connection accepted, new fd created
 		in_queue	// connection get_state_request received, wait to be served
 		sr_primary	// connection state_response sending 
@@ -19,12 +22,12 @@ client_socket
 		cr_primary	// connection state_change response sending 
 error
 signal
-	pipe
-timer
+	pipe			// well known self-pipe trick to handle signals non-blocking way with select
+timer				// the timer sends signals to update connection TTL and remove old stuff
 
 	[workflow]
 init_environment		// get & validate input information from user
-	usage_informer
+	usage_informer		// informs user in case of error args and port choosen
 init_listener
 init_pipe 	// signals included
 start_timer
@@ -34,10 +37,10 @@ main loop:
 	handle_signals
 	accept_connections
 	respond_accepted
-	handle_primary
+	handle_primary[sr, cs, cr]
 
 	[concepts]
 * non-blocking IO
 * timer to check old connections and remove them
-* wrong messages make server to close the spamming socket
+* wrong messages force server to close the spamming socket
 * self-pipe signals handling (just for curiousity)

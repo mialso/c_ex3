@@ -11,6 +11,10 @@
 #include "server_socket_list.h"
 #include "fsm.h"
 
+// define connections time-to-live
+#define WAIT_TTL 10;
+#define ACT_TTL 3;
+
 // global descriptors to handle by select
 extern int fsm_log_file;
 extern int pipe_read_fd;
@@ -51,32 +55,26 @@ int main(int argc, char *argv[])
 	// init arguments -> create environment
 	init_env(argc, argv);
 
-
 	// init passive socket - listener
 	init_listener();
 	// init signal pipe 
 	if (OK != init_signal_pipe()) {
 		fatal_error(SIGNAL_FAIL);
 	}
-	// init socket_lists
-	accepted_socks.ttl = 10;
-	sr_socks.ttl = 3;
-	cs_socks.ttl = 3;
-	cr_socks.ttl = 3;
+	// init connection ttl (socket_lists)
+	accepted_socks.ttl = WAIT_TTL;
+	sr_socks.ttl = ACT_TTL;
+	cs_socks.ttl = ACT_TTL;
+	cr_socks.ttl = ACT_TTL;
 
 //main_loop:
 	for (;;) 
 	{
 		wait_all();
-
 		handle_signals();
-
 		accept_connections();
-
 		respond_accepted();
-	
 		handle_primary();
-
 		handle_fsm_logs();
 	}
 }
@@ -108,7 +106,7 @@ void init_listener()
 void wait_all() 
 {
 	int act;
-	max_sd = 0;
+	max_sd = STDERR_FILENO;	// to prevent select freeze std-channels communication
 	// clean & set up sets
 	FD_ZERO(&main_set);
 	FD_ZERO(&write_set);
@@ -168,7 +166,7 @@ void handle_signals()
 			++counter;
 		}
 	}
-	if (counter & 4) {
+	if (3 == (counter & 3)) {	// simple 4%
 		log_server_state();
 	}
 }
@@ -371,24 +369,30 @@ void fatal_error(enum server_error_name err_name)
 void log_server_state()
 {
 	struct fsm_server_sock_node *node;
-	int counter = 0;
+	static int counter = 0;
+	int accepted_num = 0;
+	int sr_num = 0;
+	int cs_num = 0;
+	int cr_num = 0;
+	if (!counter) {
+		++counter;
+		printf("connections:\n");
+		printf("| accepted | sr | cs | cr |\n");
+		printf("  %8d, %4d,%4d,%4d", accepted_num, sr_num, cs_num, cr_num);
+		fflush(stdout);
+	}
 	for (node = accepted_socks.first; node != NULL; node = node->next) {
-		++counter;
+		++accepted_num;
 	}
-	serv_log("accepted_socks", counter);
-	counter = 0;
 	for (node = sr_socks.first; node != NULL; node = node->next) {
-		++counter;
+		++sr_num;
 	}
-	serv_log("sr_socks", counter);
-	counter = 0;
 	for (node = cs_socks.first; node != NULL; node = node->next) {
-		++counter;
+		++cs_num;
 	}
-	serv_log("cs_socks", counter);
-	counter = 0;
 	for (node = cr_socks.first; node != NULL; node = node->next) {
-		++counter;
+		++cr_num;
 	}
-	serv_log("cr_socks", counter);
+	printf("\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b  %08d, %04d,%04d,%04d", accepted_num, sr_num, cs_num, cr_num);
+	fflush(stdout);
 }

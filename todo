@@ -1,14 +1,11 @@
 
 	[general]
-*log-module
-	** error logging
 *resource management
 	* provide 'atexit' handlers to all 
+		* refactor all design docs to find out resources
 **testing
 	*  implement multiple-client testing
 	** implement tests for static procedures
-
-	<server-module>
 
 	<client-module>
 * refactor logic and add misbehaving procs

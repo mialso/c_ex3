@@ -157,7 +157,6 @@ int remove_node(struct fsm_server_sock_list *list, struct fsm_server_sock_node *
 	else {
 		return 6;	// corrupted list
 	}
-
 	free(node);
 
 	return 0; 	// OK
@@ -168,19 +167,21 @@ void pmodule_err(char *mes, int is_sys_err)
 	size_t prefix_len = strlen(MODULE_NAME);
 	size_t mes_len = strlen(mes);
 	if (126 < (prefix_len + mes_len)) {
-		fprintf(stderr, "[ERROR]: %s module_err message too long\n", MODULE_NAME);
+		//fprintf(stderr, "[ERROR]: %s module_err message too long\n", MODULE_NAME);
+		printf("[ERROR]: %s module_err message too long\n", MODULE_NAME);
 		return;
 	}
 	if (NULL == strncpy(mes_out, MODULE_NAME, prefix_len)) {
 		fprintf(stderr, "[ERROR]: %s module_err strncpy NULL return\n", MODULE_NAME);
 		return;
 	}
-	mes_out[prefix_len-1] = ' ';
-	if (NULL == strncpy(mes_out+prefix_len, mes, mes_len)) {
+	mes_out[prefix_len] = ' ';
+	if (NULL == strncpy(mes_out+prefix_len+1, mes, mes_len)) {
 		fprintf(stderr, "[ERROR]: %s module_err strncpy NULL return\n", MODULE_NAME);
 		return;
 	}
 	if (is_sys_err) {
 		perror(mes_out);
 	}
+	fprintf(stderr, "[ERROR]: %s\n", mes_out);
 }

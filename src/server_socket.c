@@ -1,8 +1,6 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <errno.h>
-//#include <sys/types.h>
-//#include <sys/socket.h>
 #include <arpa/inet.h> 		// htons, ntohs
 
 #include "server_socket.h"
@@ -97,7 +95,6 @@ int sock_read_state_change(int socket, char *state)
 		return 1;	// error
 	}
 	if (mes_len == req_mes_len) {
-		printf("[INFO]: received %s len = %ld\n", buf, mes_len);
 		if ('C' == buf[0] && 'S' == buf[1]) {
 			switch (buf[2]) {
 				case 'U':
@@ -109,7 +106,7 @@ int sock_read_state_change(int socket, char *state)
 			}
 		}
 	}
-	printf("[INFO]: error received %s len = %ld\n", buf, mes_len);
+	printf("[ERROR]: <server_socket>: sock_read_state_change(): wrong message length, %s len = %ld\n", buf, mes_len);
 	return 3;	// wrong message
 }
 int sock_send_response(int socket, char *buf, int mes_len)
@@ -120,7 +117,6 @@ int sock_send_response(int socket, char *buf, int mes_len)
 		return 1;
 	}
 	if (mes_len == out_len) {
-		printf("[INFO]: %s success written\n", buf);
 		return 0; 	// success
 	}
 	return 2; 	// error, may be partial write possible, signal interrupted or smth else
@@ -134,7 +130,6 @@ int is_partial(int socket, int mes_size)
 		return 1; 	// error
 	}
 	if (ready_size < mes_size) {
-		//printf("[LOG]: server_socket: partial message of size=%d '%s', sock = %d\n",ready_size, buf, socket);
 		return 2;	// partial message
 	}
 	return 0;
