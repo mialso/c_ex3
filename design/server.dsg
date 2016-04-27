@@ -1,26 +1,74 @@
 		server design doc
+
 	[server purpose]:
-* to help fsm provide its state to connected clients and to receive state-change requests
+* to help FSM provide its state to connected clients
+
 	[functional requirements]:
+* accept connections
+* receive state and change-state requests
+* respond with FSM-state to appropriate request
+
+	[technical requirements]:	// <imp> is stand for implementation details, to achive particular requirement
+* provide single FSM, shared among all connections
+	<imp>: queues for each connection state, implemented as double-linked list, to serve all connections with single FSM
 * serve as many connections as many system resources available
+	<imp>: timer to init connection ttl count, and remove old one
+	<imp>: wrong messages force server to close the connection, only appropriate requests served 
 * serve connections on a fair base, dont stuck at one
+	<imp>: 'select()' to serve clients non-blocking way
 * one single-threaded process
-	[usage]:
+* partial messages should not be considered errors
+	<imp>: partial messages checked by 'recv()' with 'MSG_PEEK' flag, leaving them to be served on next main loop iteration
+* error handling
+	<imp>: self-pipe trick to handle signals
+
+	[manager interface]: 	// usage
 FSMserver <port>
 	* if port is not in range 50000..55000 inform user and pick system provided one
 	* if port is not specified, the server starts with a system provided one and informs user
+stdout
+	* real_time monitoring current connections
+stderr		// error output
+
+	[user inteface]:
+* port number, which passive socket is bind to
 
 	[data model]
 connection:
 	server_socket
 	client_socket
-		state:
-		accepted 	// connection accepted, new fd created
-		in_queue	// connection get_state_request received, wait to be served
-		sr_primary	// connection state_response sending 
-		cs_primary	// connection state_change_req waiting 
-		cr_primary	// connection state_change response sending 
+		[state]:	// the state-model is similar to fsm states
+		acc      	// connection accepted, new fd created
+		sr        	// connection state_response sending 
+		cs        	// connection state_change_req waiting 
+		cr        	// connection state_change response sending 
+	|-----------------------------------------------------------------|
+	|          |                        state                         |
+	| events   |------------------------------------------------------|
+	|          |   null   |   acc    |    sr    |    cs    |    cr    |
+	|----------|------------------------------------------------------|
+	| connect  |  SwAcc   |    -     |    -     |    -     |    -     |
+	| StReq    |          |   SwSr   |   ERR    |   ERR    |   ERR    |
+	| StRes    |          |   ERR    |   SwCs   |   ERR    |   ERR    |
+	| ChReq    |          |   ERR    |   ERR    |   SwCr   |   ERR    |
+	| ChRes    |          |   ERR    |   ERR    |   ERR    |   SwAcc  |
+	|----------|------------------------------------------------------|
+		[actions]:
+	ERR   -- disconnect and close socket
+	SendR -- send response
+	SwAcc -- switch to accepted state
+	SwSr  -- switch to sr_primary state
+	SwCs  -- switch to cs_primary state
+	SwCr  -- switch to cr_primary state
+
+		[events]:
+	StReq -- state request by client
+	StRes -- state response to client
+	ChReq -- change state request by client
+	ChRes -- change state response by client
+
 error
+	message
 signal
 	pipe			// well known self-pipe trick to handle signals non-blocking way with select
 timer				// the timer sends signals to update connection TTL and remove old stuff
@@ -30,17 +78,12 @@ init_environment		// get & validate input information from user
 	usage_informer		// informs user in case of error args and port choosen
 init_listener
 init_pipe 	// signals included
-start_timer
+init_timer
 
 main loop:
 	wait_all
 	handle_signals
 	accept_connections
-	respond_accepted
-	handle_primary[sr, cs, cr]
+	<respond_[conn_state]>
+	handle_fsm_logs
 
-	[concepts]
-* non-blocking IO
-* timer to check old connections and remove them
-* wrong messages force server to close the spamming socket
-* self-pipe signals handling (just for curiousity)

@@ -11,14 +11,14 @@ the matrix of a machine
 | ChReqL |    E1    |    CL    |    E1    |    E1    |
 | ChReqR |    E1    |    CR    |    E1    |    E1    |
 |--------|-------------------------------------------|
-	events: 
+	[events]: 
 StReq -- state request by client
 ChReqU -- 'change to UP state' request by client
 ChReqD -- 'change to DOWN state' request by client
 ChReqL -- 'change to LEFT state' request by client
 ChReqR -- 'change to RIGHT state' request by client
 
-	actions:
+	[actions]:
 R1 -- response with current state
 E1 -- error switching state due to unspecified workflow
 CU -- switch(change) to UP state
