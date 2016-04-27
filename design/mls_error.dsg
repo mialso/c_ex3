@@ -1,0 +1,21 @@
+		error module design doc
+
+	[purpose]:
+* to output errors by providing error messages and errno in case of system call failure
+* to help program modules output errors in similar way, avoid error handling repeats and 'ifing' every interface call
+
+	[functional requirements]:
+* handle out sys-call errors with appropriate messages
+* handle internal module errors with description
+* handle errors in 'fatal' way without return to caller by invoking 'exit()' as a result
+
+	[data model]:
+error
+	description
+		|message_num|errno
+		module_name
+		procedure_name
+		error_description
+	type
+		fatal
+		wrong_usage

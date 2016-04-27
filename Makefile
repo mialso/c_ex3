@@ -15,15 +15,16 @@ fsm_logger_objs = fsm_logger.o test_fsm_logger.o tests.o
 server_socket_objs = server_socket.o test_server_socket.o tests.o
 server_socket_list_objs = server_socket_list.o test_server_socket_list.o tests.o
 client_socket_objs = client_socket.o server_socket.o test_client_socket.o tests.o
+mls_error_objs = mls_error.o test_mls_error.o tests.o
 
 all:
 	@echo "all invoked, no logic implemented yet, try 'server' or 'client'"
 
 server: $(server_objs)
-	@mkdir -p ./bin/
+	mkdir -p ./bin/
 	$(CC) -o ./bin/FSMserver $^ $(LIBS)
 client: $(client_objs)
-	@mkdir -p ./bin/
+	mkdir -p ./bin/
 	$(CC) -o ./bin/FSMclient $^
 
 # server
@@ -48,14 +49,18 @@ client.o: client.c
 client_socket.o: client_socket.c client_socket.h
 	$(CC) -c $(TEST_FLAGS) $< -o $@
 
+# libs
+mls_error.o: mls_error.c mls_error.h
+	$(CC) -c $(TEST_FLAGS) $< -o $@
+
 
 # tests common
 tests.o: %.o: %.c
 	$(CC) -c $(TEST_FLAGS) $< -o $@
+	mkdir -p ./bin/tests/
 
 # fsm related tests
 test_fsm: $(fsm_objs)
-	@mkdir -p ./bin/tests/
 	$(CC) -o ./bin/tests/test_fsm $^
 	./bin/tests/test_fsm
 	make clean_tests
@@ -64,9 +69,8 @@ test_fsm.o: %.o: %.c
 
 # fsm_logger related tests
 test_fsm_logger: $(fsm_logger_objs)
-	@mkdir -p ./bin/tests/
 	$(CC) -o ./bin/tests/test_fsm_logger $^
-	@echo "... test with some delay ... about 5 seconds, please be patient ..."
+	echo "... test with some delay ... about 5 seconds, please be patient ..."
 	./bin/tests/test_fsm_logger
 	cat ./bin/fsm.log
 	rm ./bin/fsm.log
@@ -76,7 +80,6 @@ test_fsm_logger.o: %.o: %.c
 
 # server_socket tests
 test_server_socket: $(server_socket_objs)
-	@mkdir -p ./bin/tests/
 	$(CC) -o ./bin/tests/test_server_socket $^
 	./bin/tests/test_server_socket
 	make clean_tests
@@ -85,7 +88,6 @@ test_server_socket.o: %.o: %.c
 
 # client_socket tests
 test_client_socket: $(client_socket_objs)
-	@mkdir -p ./bin/tests/
 	$(CC) -o ./bin/tests/test_client_socket $^
 	./bin/tests/test_client_socket
 	make clean_tests
@@ -94,16 +96,25 @@ test_client_socket.o: %.o: %.c
 	
 # server_socket_list tests
 test_server_socket_list: $(server_socket_list_objs)
-	@mkdir -p ./bin/tests/
 	$(CC) -o ./bin/tests/test_server_socket_list $^
 	./bin/tests/test_server_socket_list
 	make clean_tests
 test_server_socket_list.o: %.o: %.c
 	$(CC) -c $(TEST_FLAGS) $< -o $@
 
+# mls_error tests
+test_mls_error: $(mls_error_objs)
+	$(CC) -o ./bin/tests/test_mls_error $^
+	./bin/tests/test_mls_error sys 2> /dev/null || true
+	#./bin/tests/test_mls_error s || true
+	./bin/tests/test_mls_error int 2> /dev/null || true
+	#./bin/tests/test_mls_error i || true
+	make -s clean_tests
+test_mls_error.o: %.o: %.c
+	$(CC) -c $(TEST_FLAGS) $< -o $@
+
 .PHONY: clean_tests
 clean_tests:
-	#-rm *.o
 	find . -name "*.o" -exec rm {} \;
 	-rm -rf ./bin/tests
 .PHONY: clean
