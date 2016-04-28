@@ -4,6 +4,6 @@
 #define TIMER_SIGNAL 't'
 static const char timer_signal = 't';
 
-int init_signal_pipe(void);
+void init_signal_pipe(void);
 
 #endif

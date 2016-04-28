@@ -58,9 +58,7 @@ int main(int argc, char *argv[])
 	// init passive socket - listener
 	init_listener();
 	// init signal pipe 
-	if (OK != init_signal_pipe()) {
-		fatal_error(SIGNAL_FAIL);
-	}
+	init_signal_pipe();
 	// init connection ttl (socket_lists)
 	accepted_socks.ttl = WAIT_TTL;
 	sr_socks.ttl = ACT_TTL;
