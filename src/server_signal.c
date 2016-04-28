@@ -2,7 +2,7 @@
 #include <errno.h>
 #include <string.h>
 #include <stddef.h>
-#include <setjmp.h>
+#include <stdlib.h>
 #include <unistd.h>
 #include <signal.h>
 #include <fcntl.h>
@@ -11,7 +11,10 @@
 #include "server_signal_error.h"
 #include "server_signal_timer.h"
 
-#define MODULE_NAME "<server_signal>"
+#define TIMER_INTERVAL 200
+// pipe ends marked explicitly
+#define READ_END 0
+#define WRITE_END 1
 
 // global pipe fds
 int pipe_read_fd;
@@ -20,107 +23,80 @@ int pipe_read_fd;
 static struct sigaction sig_act;
 static int pipe_fds[2];
 
-// error stuff
-static jmp_buf goto_error;
-static enum server_signal_error_name module_err;
-
 // service declararions
 static void init_pipe(void);
 static void init_signals(void);
-static inline void pmodule_err(char *mes);
 // signal handlers
 static void timer_signal_handler();
 
-int init_signal_pipe()
+void init_signal_pipe()
 {
-	// error handler
-	module_err = setjmp(goto_error);
-	if (OK < module_err) {
-		// handle error
-		return module_err;
-	}
+	int timer_error;
 	// main flow
 	init_pipe();
 	init_signals();
-	if (OK != start_timer(200)) {
-		return TIMER_FAIL;
+	if ((timer_error = start_timer(TIMER_INTERVAL))) {
+		proc_name = START_TIMER;
+		syscall_fatal_error(&module_err_data, timer_error, proc_name);
+	}
+	if ((timer_error = atexit(&stop_timer))) {
+		proc_name = STOP_TIMER;
+		error_name = STOP_TIMER;
+		internal_fatal_error(&module_err_data, error_name, proc_name);
 	}
 	
-	pipe_read_fd = pipe_fds[0];
-	return OK;
+	pipe_read_fd = pipe_fds[READ_END];
 }
 
 void init_pipe()
 {
 	int flags;
+	proc_name = INIT_PIPE;
 	if (-1 == pipe(pipe_fds)) {
-		pmodule_err("init_pipe() pipe failed");
-		longjmp(goto_error, PIPE_INIT_ERR);
+		syscall_fatal_error(&module_err_data, errno, proc_name);
 	}
 	// make read end non-blocking
-	if (-1 == (flags = fcntl(pipe_fds[0], F_GETFL))) {
-		pmodule_err("init_pipe() fcntl F_GETFL failed");
-		longjmp(goto_error, PIPE_INIT_ERR);
+	if (-1 == (flags = fcntl(pipe_fds[READ_END], F_GETFL))) {
+		syscall_fatal_error(&module_err_data, errno, proc_name);
 	}
 	flags |= O_NONBLOCK;
-	if (-1 == fcntl(pipe_fds[0], F_SETFL, flags)) {
-		pmodule_err("init_pipe() fcntl F_SETFL failed");
-		longjmp(goto_error, PIPE_INIT_ERR);
+	if (-1 == fcntl(pipe_fds[READ_END], F_SETFL, flags)) {
+		syscall_fatal_error(&module_err_data, errno, proc_name);
 	}
 	// make write end non-blocking
-	if (-1 == (flags = fcntl(pipe_fds[1], F_GETFL))) {
-		pmodule_err("init_pipe() fcntl F_GETFL failed");
-		longjmp(goto_error, PIPE_INIT_ERR);
+	if (-1 == (flags = fcntl(pipe_fds[WRITE_END], F_GETFL))) {
+		syscall_fatal_error(&module_err_data, errno, proc_name);
 	}
 	flags |= O_NONBLOCK;
-	if (-1 == fcntl(pipe_fds[1], F_SETFL, flags)) {
-		pmodule_err("init_pipe() fcntl F_SETFL failed");
-		longjmp(goto_error, PIPE_INIT_ERR);
+	if (-1 == fcntl(pipe_fds[WRITE_END], F_SETFL, flags)) {
+		syscall_fatal_error(&module_err_data, errno, proc_name);
 	}
 
 }
 void init_signals()
 {
+	proc_name = INIT_SIGNALS;
+
 	sigemptyset(&sig_act.sa_mask);
 	sig_act.sa_flags = SA_RESTART;
 	sig_act.sa_handler = timer_signal_handler; 	// signal handler
 	if (-1 == sigaction(SIGUSR1, &sig_act, NULL)) {
-		pmodule_err("init_pipe() sigaction failed");
-		longjmp(goto_error, SIGNAL_INIT_ERR);
+		syscall_fatal_error(&module_err_data, errno, proc_name);
 	}
 
 }
 void timer_signal_handler()
 {
+	proc_name = TIMER_SIGNAL_HANDLER;
 	int saved_errno;
 	
 	saved_errno = errno;
-	
-	if (-1 == write(pipe_fds[1], &timer_signal, 1)) {
+	if (-1 == write(pipe_fds[WRITE_END], &timer_signal, 1))
+	{
 		if (EAGAIN != errno) {
-			pmodule_err("timer_signal_handler() write failed");
+			syscall_fatal_error(&module_err_data, errno, proc_name);
 		}
 	}
 	errno = saved_errno;
-}
-void pmodule_err(char *mes)
-{
-	char mes_out[128] = {'\0'};
-	size_t prefix_len = strlen(MODULE_NAME);
-	size_t mes_len = strlen(mes);
-	if (126 < (prefix_len + mes_len)) {
-		fprintf(stderr, "[ERROR]: %s module_err message too long\n", MODULE_NAME);
-		return;
-	}
-	if (NULL == strncpy(mes_out, MODULE_NAME, prefix_len)) {
-		fprintf(stderr, "[ERROR]: %s module_err strncpy NULL return\n", MODULE_NAME);
-		return;
-	}
-	mes_out[prefix_len-1] = ' ';
-	if (NULL == strncpy(mes_out+prefix_len, mes, mes_len)) {
-		fprintf(stderr, "[ERROR]: %s module_err strncpy NULL return\n", MODULE_NAME);
-		return;
-	}
-	perror(mes_out);
 }
 

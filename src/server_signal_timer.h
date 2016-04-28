@@ -3,6 +3,6 @@
 
 int start_timer(int m_secs);
 
-int stop_timer();
+void stop_timer();
 
 #endif

@@ -6,7 +6,7 @@ vpath %.c ./test_src
 vpath %.h ./test_src
 
 # main targets
-server_objs = server.o server_socket.o server_signal.o server_signal_timer.o server_socket_list.o fsm.o fsm_logger.o
+server_objs = server.o server_socket.o server_signal.o server_signal_timer.o server_socket_list.o fsm.o fsm_logger.o mls_error.o
 client_objs = client.o client_socket.o
 
 # test targets

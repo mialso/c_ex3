@@ -1,9 +1,9 @@
 #include <time.h>
 #include <signal.h>
-#include <stdio.h>
 #include <stdlib.h>
+#include <errno.h>
 
-
+// resources
 static timer_t timer;
 
 int start_timer(int m_secs)
@@ -20,24 +20,18 @@ int start_timer(int m_secs)
 	ts.it_interval.tv_nsec = m_secs*1000000;
 	ts.it_value.tv_sec = 0;
 	ts.it_value.tv_nsec = m_secs*1000000;
-	//ts.it_value.tv_nsec = 0;
-
+	
 	if (-1 == (ret = timer_create(CLOCK_REALTIME, &evp, &timer))) {
-		perror("server_timer: start_timer() create failed");
-		return 1;
+		return errno;
 	}
 
 	if (-1 == (ret = timer_settime(timer, 0, &ts, NULL))) {
-		perror("server_timer: start_timer() settime failed");
-		return 1;
+		return errno;
 	}
+	
 	return 0;
 }
-int stop_timer()
+void stop_timer()
 {
-	if (-1 == timer_delete(timer)) {
-		perror("server_timer: stop_timer() delete failed");
-		return 1;
-	}
-	return 0;
+	timer_delete(timer);
 }
